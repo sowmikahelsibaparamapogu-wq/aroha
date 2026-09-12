@@ -1,0 +1,6 @@
+{
+  "name": "AROHA - MoTA Scholarship & Fellowship System",
+  "description": "Ministry of Tribal Affairs AI-Enabled Scholarship & Fellowship Management System for NFST & NOS with green forest theme, multilingual support, tribal art showcase, and AROHA Mitra bot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

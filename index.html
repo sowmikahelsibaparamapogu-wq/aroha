@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      // Gracefully filter benign Vite HMR websocket disconnection logs in sandboxed dev container
+      (function() {
+        function isViteHmrNoise(arg) {
+          if (!arg) return false;
+          try {
+            const str = typeof arg === 'string' ? arg : (arg.message || JSON.stringify(arg) || String(arg));
+            return (
+              str.includes('[vite]') ||
+              str.includes('vite') ||
+              str.includes('vite-plugin-pwa') ||
+              str.includes('failed to connect to websocket') ||
+              str.includes('WebSocket connection to') ||
+              str.includes('ws://') ||
+              str.includes('wss://')
+            );
+          } catch (e) {
+            return false;
+          }
+        }
+
+        ['log', 'info', 'warn', 'error', 'debug'].forEach(function(method) {
+          const orig = console[method];
+          if (orig) {
+            console[method] = function(...args) {
+              if (args.some(isViteHmrNoise)) return;
+              orig.apply(console, args);
+            };
+          }
+        });
+
+        const _RealWebSocket = window.WebSocket;
+        if (_RealWebSocket) {
+          window.WebSocket = function(url, protocols) {
+            if (protocols === 'vite-hmr' || (typeof url === 'string' && (url.includes('vite') || url.includes('/@vite')))) {
+              return {
+                addEventListener: function() {},
+                removeEventListener: function() {},
+                dispatchEvent: function() { return false; },
+                send: function() {},
+                close: function() {},
+                readyState: 3,
+                onopen: null,
+                onclose: null,
+                onerror: null,
+                onmessage: null,
+              };
+            }
+            return new _RealWebSocket(url, protocols);
+          };
+          window.WebSocket.prototype = _RealWebSocket.prototype;
+          window.WebSocket.CONNECTING = 0;
+          window.WebSocket.OPEN = 1;
+          window.WebSocket.CLOSING = 2;
+          window.WebSocket.CLOSED = 3;
+        }
+
+        window.addEventListener('error', function(event) {
+          if (event.message && isViteHmrNoise(event.message)) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function(event) {
+          if (event.reason && isViteHmrNoise(event.reason)) {
+            event.stopImmediatePropagation();
+            event.preventDefault();
+          }
+        }, true);
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AROHA - MoTA Scholarship & Fellowship System</title>
+    <meta name="description" content="Ministry of Tribal Affairs AI-Enabled Scholarship & Fellowship Management System for NFST & NOS with green forest theme, multilingual support, tribal art showcase, and AROHA Mitra bot." />
+    <meta property="og:title" content="AROHA - MoTA Scholarship & Fellowship System" />
+    <meta property="og:description" content="Ministry of Tribal Affairs AI-Enabled Scholarship & Fellowship Management System for NFST & NOS with green forest theme, multilingual support, tribal art showcase, and AROHA Mitra bot." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#064e3b" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="AROHA MoTA" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-screen">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
