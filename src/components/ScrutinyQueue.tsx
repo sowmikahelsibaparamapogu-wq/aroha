@@ -9,26 +9,46 @@ import {
   SlidersHorizontal,
   ChevronRight,
   ShieldAlert,
-  Sparkles
+  Sparkles,
+  XCircle,
+  FileCheck2,
+  FileX2,
+  FileText
 } from 'lucide-react';
-import { Application, SchemeType, ApplicationStatus } from '../types/scholarship';
+import { Application, SchemeType, ApplicationStatus, DocumentUpload } from '../types/scholarship';
 import { useLanguage } from '../context/LanguageContext';
 import { Avatar } from './Avatar';
+import { DocumentViewerModal } from './DocumentViewerModal';
+import { INDIAN_ADMINISTRATIVE_DIVISIONS } from '../data/indianStates';
 
 interface ScrutinyQueueProps {
   applications: Application[];
   onOpenScrutiny: (app: Application) => void;
+  onRejectApplication?: (appId: string, clauseCode: string, fullRemarks: string) => void;
+  onApproveApplication?: (appId: string, remarks: string) => void;
 }
 
 export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
   applications,
   onOpenScrutiny,
+  onRejectApplication,
+  onApproveApplication,
 }) => {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState('');
   const [schemeFilter, setSchemeFilter] = useState<'ALL' | SchemeType>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | ApplicationStatus>('ALL');
+  const [stateFilter, setStateFilter] = useState<string>('ALL');
   const [onlyFlagged, setOnlyFlagged] = useState(false);
+  const [selectedDocForPreview, setSelectedDocForPreview] = useState<{
+    doc: DocumentUpload;
+    app: Application;
+  } | null>(null);
+
+  const pendingCount = applications.filter((a) => a.status === 'in_scrutiny' || a.status === 'ocr_verified').length;
+  const discrepancyCount = applications.filter((a) => a.status === 'flagged_deficiency' || a.aiAnalysis?.requiresHumanReview).length;
+  const rejectedCount = applications.filter((a) => a.status === 'rejected').length;
+  const approvedCount = applications.filter((a) => a.status === 'approved' || a.status === 'merit_listed' || a.status === 'dbt_active').length;
 
   const filteredApps = applications.filter((app) => {
     const matchesSearch =
@@ -39,13 +59,72 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
 
     const matchesScheme = schemeFilter === 'ALL' || app.scheme === schemeFilter;
     const matchesStatus = statusFilter === 'ALL' || app.status === statusFilter;
+    const matchesState =
+      stateFilter === 'ALL' ||
+      app.applicant.state.toLowerCase() === stateFilter.toLowerCase() ||
+      app.applicant.domicileState?.toLowerCase() === stateFilter.toLowerCase();
     const matchesFlag = !onlyFlagged || app.aiAnalysis?.requiresHumanReview || app.status === 'flagged_deficiency';
 
-    return matchesSearch && matchesScheme && matchesStatus && matchesFlag;
+    return matchesSearch && matchesScheme && matchesStatus && matchesState && matchesFlag;
   });
 
   return (
     <div className="space-y-6">
+      {/* Scrutinizer Workflow Metric Pills */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('ALL'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+            statusFilter === 'ALL' && !onlyFlagged
+              ? 'bg-amber-50/80 border-amber-300 ring-2 ring-amber-400/20'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">All Scrutiny Files</div>
+          <div className="text-xl font-black text-slate-900 mt-1">{applications.length}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('in_scrutiny'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+            statusFilter === 'in_scrutiny'
+              ? 'bg-orange-50/80 border-orange-300 ring-2 ring-orange-400/20'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="text-[11px] font-bold text-orange-700 uppercase tracking-wider">Pending Review</div>
+          <div className="text-xl font-black text-orange-950 mt-1">{pendingCount}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setOnlyFlagged(true); setStatusFilter('ALL'); }}
+          className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+            onlyFlagged
+              ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-400/20'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Flagged Discrepancy</div>
+          <div className="text-xl font-black text-amber-950 mt-1">{discrepancyCount}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => { setStatusFilter('rejected'); setOnlyFlagged(false); }}
+          className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+            statusFilter === 'rejected'
+              ? 'bg-rose-50/80 border-rose-300 ring-2 ring-rose-400/20'
+              : 'bg-white border-slate-200 hover:border-slate-300'
+          }`}
+        >
+          <div className="text-[11px] font-bold text-rose-700 uppercase tracking-wider">Statutory Rejected</div>
+          <div className="text-xl font-black text-rose-950 mt-1">{rejectedCount}</div>
+        </button>
+      </div>
+
       {/* Top Filter & Search Controls */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Search */}
@@ -84,6 +163,24 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
             <option value="approved">{t('verifiedApproved')}</option>
             <option value="merit_listed">{t('meritSelected')}</option>
             <option value="dbt_active">{t('dbtDisbursed')}</option>
+          </select>
+
+          <select
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-300 bg-white cursor-pointer"
+            title="Filter by State / Union Territory"
+          >
+            <option value="ALL">{t('allStates')} (36)</option>
+            {INDIAN_ADMINISTRATIVE_DIVISIONS.map((div) => (
+              <optgroup key={div.group} label={div.group}>
+                {div.items.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
 
           <button
@@ -188,6 +285,35 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
                       <div className="text-[10px] text-slate-400 mt-1">
                         {app.documents?.length || 0} {t('docsParsed')}
                       </div>
+                      {/* Scrutinizer Quick Document Access Chips */}
+                      {app.documents && app.documents.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1.5 max-w-[200px]">
+                          {app.documents.slice(0, 3).map((d) => (
+                            <button
+                              key={d.id}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedDocForPreview({ doc: d, app });
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer"
+                              title={`Inspect ${d.name}`}
+                            >
+                              <FileText className="w-2.5 h-2.5 text-blue-500" />
+                              <span className="truncate max-w-[85px]">
+                                {d.type === 'caste_certificate'
+                                  ? 'Caste'
+                                  : d.type === 'income_certificate'
+                                  ? 'Income'
+                                  : d.type === 'marksheet'
+                                  ? 'Marksheet'
+                                  : 'Doc'}
+                              </span>
+                              <Eye className="w-2.5 h-2.5 text-slate-400 hover:text-blue-600" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </td>
 
                     {/* Rule Evaluation */}
@@ -214,7 +340,12 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
 
                     {/* Status Pill */}
                     <td className="py-3.5 px-5">
-                      {app.status === 'dbt_active' ? (
+                      {app.status === 'rejected' ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200 text-[11px] font-bold">
+                          <XCircle className="w-3 h-3 text-rose-600" />
+                          <span>Statutory Rejected</span>
+                        </span>
+                      ) : app.status === 'dbt_active' ? (
                         <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold">
                           {t('dbtDisbursed')}
                         </span>
@@ -258,6 +389,28 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Scrutinizer Document Viewer Modal */}
+      {selectedDocForPreview && (
+        <DocumentViewerModal
+          document={selectedDocForPreview.doc}
+          application={selectedDocForPreview.app}
+          onClose={() => setSelectedDocForPreview(null)}
+          onFlagDeficiency={() => {
+            onOpenScrutiny(selectedDocForPreview.app);
+            setSelectedDocForPreview(null);
+          }}
+          onMarkVerified={() => {
+            if (onApproveApplication) {
+              onApproveApplication(
+                selectedDocForPreview.app.id,
+                `${selectedDocForPreview.doc.name} verified by Scrutinizer.`
+              );
+            }
+            setSelectedDocForPreview(null);
+          }}
+        />
+      )}
     </div>
   );
 };

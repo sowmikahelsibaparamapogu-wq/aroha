@@ -9,11 +9,16 @@ import {
   Eye, 
   ShieldCheck,
   Zap,
-  Clock
+  Clock,
+  XCircle,
+  AlertCircle,
+  Maximize2
 } from 'lucide-react';
 import { DocumentUpload, SchemeType } from '../types/scholarship';
 import { simulateOCRExtraction } from '../services/ocrService';
+import { matchEnteredFieldsWithDocument, DocumentFieldMatchResult } from '../services/fieldMatcher';
 import { useLanguage } from '../context/LanguageContext';
+import { DocumentViewerModal } from './DocumentViewerModal';
 
 interface DocumentUploadCardProps {
   docType: DocumentUpload['type'];
@@ -22,8 +27,13 @@ interface DocumentUploadCardProps {
   required?: boolean;
   scheme: SchemeType;
   applicantName?: string;
+  fatherName?: string;
   stCommunity?: string;
   annualIncome?: number;
+  qualifyingPercentage?: number;
+  state?: string;
+  offerStatus?: 'Conditional' | 'Unconditional';
+  qsWorldRanking?: number;
   document?: DocumentUpload;
   onUploadComplete: (doc: DocumentUpload) => void;
   onRemove: (id: string) => void;
@@ -37,8 +47,13 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   required = true,
   scheme,
   applicantName,
+  fatherName,
   stCommunity,
   annualIncome,
+  qualifyingPercentage,
+  state,
+  offerStatus,
+  qsWorldRanking,
   document,
   onUploadComplete,
   onRemove,
@@ -51,17 +66,33 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   const [scanProgress, setScanProgress] = useState(0);
   const [scanStatusText, setScanStatusText] = useState('');
   const [showExtractedPreview, setShowExtractedPreview] = useState(false);
+  const [showFullDocModal, setShowFullDocModal] = useState(false);
+
+  // Compute live match between entered fields and scanned document
+  const matchResult: DocumentFieldMatchResult | null = document
+    ? matchEnteredFieldsWithDocument(
+        {
+          fullName: applicantName || '',
+          fatherName,
+          stCommunity: stCommunity || 'Gond',
+          annualFamilyIncome: annualIncome || 360000,
+          qualifyingPercentage: qualifyingPercentage || 70,
+          state,
+          offerStatus,
+          qsWorldRanking,
+          scheme,
+        },
+        document
+      )
+    : null;
 
   const handleFileProcess = async (file: File) => {
     setIsScanning(true);
     setScanProgress(10);
     setScanStatusText(t('readingBuffer') || 'Reading document buffer...');
 
-    // Generate local Data URL
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-
+    // Generate local Data URL or process pre-supplied Data URL
+    const processWithDataUrl = async (dataUrl: string) => {
       const baseDoc: DocumentUpload = {
         id: `doc_${docType}_${Date.now()}`,
         type: docType,
@@ -76,14 +107,27 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
       };
 
       try {
+        const isForcedMismatch =
+          file.name.toLowerCase().includes('mismatch') ||
+          file.name.toLowerCase().includes('wrong') ||
+          file.name.toLowerCase().includes('lapang') ||
+          file.name.toLowerCase().includes('invalid');
+
         const ocrResult = await simulateOCRExtraction(
           {
             docType,
             fileName: file.name,
+            dataUrl,
             applicantName,
+            fatherName,
             stCommunity,
             annualIncome,
+            qualifyingPercentage,
+            state,
+            offerStatus,
+            qsWorldRanking,
             scheme,
+            forceMismatch: isForcedMismatch,
           },
           (pct, msg) => {
             setScanProgress(pct);
@@ -91,12 +135,40 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           }
         );
 
+        // Run deep field comparison against entered form fields
+        const testMatch = matchEnteredFieldsWithDocument(
+          {
+            fullName: applicantName || '',
+            fatherName,
+            stCommunity: stCommunity || 'Gond',
+            annualFamilyIncome: annualIncome || 360000,
+            qualifyingPercentage: qualifyingPercentage || 70,
+            state,
+            offerStatus,
+            qsWorldRanking,
+            scheme,
+          },
+          {
+            id: baseDoc.id,
+            name: file.name,
+            type: docType,
+            extractedFields: ocrResult.extractedFields,
+            mismatches: ocrResult.mismatches,
+          }
+        );
+
+        const hasErrors = testMatch.hasErrors || ocrResult.ocrStatus === 'mismatch';
+        const combinedErrors = Array.from(
+          new Set([...(ocrResult.mismatches || []), ...(testMatch.errorMessages || [])])
+        );
+
         const finalizedDoc: DocumentUpload = {
           ...baseDoc,
-          ocrStatus: ocrResult.ocrStatus,
-          ocrConfidence: ocrResult.ocrConfidence,
+          ocrStatus: hasErrors ? 'mismatch' : 'verified',
+          ocrConfidence: hasErrors ? Math.min(ocrResult.ocrConfidence, 25) : ocrResult.ocrConfidence,
           extractedFields: ocrResult.extractedFields,
-          mismatches: ocrResult.mismatches,
+          mismatches: combinedErrors,
+          rawText: ocrResult.rawText,
         };
 
         setIsScanning(false);
@@ -105,14 +177,32 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
         setIsScanning(false);
         onUploadComplete({
           ...baseDoc,
-          ocrStatus: 'verified',
-          ocrConfidence: 90,
-          extractedFields: { 'File': file.name },
+          ocrStatus: 'mismatch',
+          ocrConfidence: 18,
+          extractedFields: { 'File': file.name, 'Status': 'Scan Error / Incompatible' },
+          mismatches: [`Scan verification failure: Unable to authenticate '${file.name}' against MoTA guidelines.`],
         });
       }
     };
 
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      processWithDataUrl(dataUrl);
+    };
     reader.readAsDataURL(file);
+  };
+
+  const handleTestSample = (isMismatch: boolean) => {
+    const fakeFileName = isMismatch
+      ? `${docType}_wrong_doc_mismatched.pdf`
+      : `${docType}_verified_official.pdf`;
+
+    const fakeFile = new File(['%PDF-1.5 MoTA Official Scholarship Document Sample'], fakeFileName, {
+      type: 'application/pdf',
+    });
+
+    handleFileProcess(fakeFile);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -155,18 +245,17 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
 
         {document && (
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {document.ocrStatus === 'verified' && (
+            {(document.ocrStatus === 'mismatch' || matchResult?.hasErrors) ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                <span>SCAN ERROR ({document.ocrConfidence}%)</span>
+              </span>
+            ) : document.ocrStatus === 'verified' ? (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                 <CheckCircle2 className="w-3 h-3 text-emerald-600" />
                 {t('ocrVerified')} ({document.ocrConfidence}%)
               </span>
-            )}
-            {document.ocrStatus === 'mismatch' && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-orange-50 text-orange-700 border border-orange-300">
-                <AlertTriangle className="w-3 h-3 text-orange-600" />
-                {t('reviewFlagged')} ({document.ocrConfidence}%)
-              </span>
-            )}
+            ) : null}
             {document.offlineQueued && (
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                 <Clock className="w-3 h-3 text-slate-500" />
@@ -205,6 +294,30 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           <p className="text-[11px] text-slate-400 mt-1">
             {t('uploadFormats')}
           </p>
+
+          <div className="mt-3 flex items-center justify-center gap-2 pt-2 border-t border-slate-200/60" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[10.5px] text-slate-500 font-medium">Quick Test:</span>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTestSample(false);
+              }}
+              className="text-[10.5px] px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 font-bold cursor-pointer transition-colors"
+            >
+              ✓ Valid Document
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTestSample(true);
+              }}
+              className="text-[10.5px] px-2.5 py-1 rounded-md bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 font-bold cursor-pointer transition-colors"
+            >
+              ⚠ Test Wrong Document
+            </button>
+          </div>
         </div>
       ) : isScanning ? (
         <div className="border border-blue-200 bg-blue-50/40 rounded-xl p-4">
@@ -244,6 +357,16 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
+                onClick={() => setShowFullDocModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 transition-colors cursor-pointer"
+                title="View Full Document"
+              >
+                <Maximize2 className="w-3.5 h-3.5 text-blue-600" />
+                <span>View Full Doc</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={() => setShowExtractedPreview(!showExtractedPreview)}
                 className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-md hover:bg-blue-50 transition-colors cursor-pointer"
               >
@@ -262,20 +385,104 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
             </div>
           </div>
 
-          {/* Mismatch warning */}
-          {document.mismatches && document.mismatches.length > 0 && (
-            <div className="p-3 rounded-lg bg-orange-50 border border-orange-200 text-orange-900 text-xs">
-              <div className="flex items-center gap-1.5 font-bold mb-1 text-orange-950">
-                <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0" />
-                <span>{t('detectedDiscrepancy')}</span>
+          {/* Prominent Scan Error & Field Match Comparison */}
+          {matchResult && matchResult.hasErrors ? (
+            <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-300 text-rose-950 text-xs space-y-3 shadow-xs animate-in fade-in">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center font-black flex-shrink-0">
+                    <XCircle className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h5 className="font-black text-xs uppercase tracking-wider text-rose-900">
+                      SCAN ERROR: ENTERED FIELDS DO NOT MATCH DOCUMENT DETAILS
+                    </h5>
+                    <p className="text-[11px] text-rose-700">
+                      Character-by-character scan detected {matchResult.errorCount} critical mismatch{matchResult.errorCount > 1 ? 'es' : ''}.
+                    </p>
+                  </div>
+                </div>
+                <span className="px-2.5 py-1 rounded-md bg-rose-200 text-rose-900 font-extrabold text-[10px] uppercase border border-rose-300 flex-shrink-0">
+                  CRITICAL ERROR
+                </span>
               </div>
-              <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-orange-800">
+
+              {/* Side-by-Side Field Comparison Table */}
+              {matchResult.fieldComparisons.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-rose-200 bg-white">
+                  <table className="w-full text-[11px] text-left">
+                    <thead className="bg-rose-100/70 text-rose-900 font-bold border-b border-rose-200">
+                      <tr>
+                        <th className="py-1.5 px-2.5">Field</th>
+                        <th className="py-1.5 px-2.5">Entered in Application</th>
+                        <th className="py-1.5 px-2.5">Scanned from Document</th>
+                        <th className="py-1.5 px-2.5">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-rose-100 font-medium">
+                      {matchResult.fieldComparisons.map((cmp, idx) => (
+                        <tr key={idx} className={cmp.isMatch ? 'bg-white' : 'bg-rose-50/70'}>
+                          <td className="py-2 px-2.5 text-slate-700 font-semibold">{cmp.fieldLabel}</td>
+                          <td className="py-2 px-2.5 text-slate-900 font-mono">
+                            <span className={cmp.isMatch ? '' : 'bg-rose-100 px-1.5 py-0.5 rounded text-rose-900 font-bold'}>
+                              {String(cmp.enteredValue)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5 text-slate-900 font-mono">
+                            <span className={cmp.isMatch ? '' : 'bg-rose-100 px-1.5 py-0.5 rounded text-rose-900 font-bold'}>
+                              {String(cmp.scannedValue)}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2.5">
+                            {cmp.isMatch ? (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 font-bold">
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Matched
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-rose-700 font-black">
+                                <XCircle className="w-3.5 h-3.5 text-rose-600" /> MISMATCH ERROR
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Exact Error Messages */}
+              <div className="space-y-1 pt-1">
+                {matchResult.errorMessages.map((errMsg, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2 rounded-lg bg-rose-100/70 border border-rose-300 text-rose-950 text-[11px] font-semibold flex items-start gap-1.5"
+                  >
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
+                    <span>{errMsg}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-2 rounded-lg bg-rose-200/50 text-[10.5px] text-rose-900 flex items-center justify-between">
+                <span>
+                  <strong>Legal Impact:</strong> Application submission with unresolved field mismatch errors will be routed to statutory rejection under MoTA guidelines.
+                </span>
+              </div>
+            </div>
+          ) : document.mismatches && document.mismatches.length > 0 ? (
+            <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-900 text-xs">
+              <div className="flex items-center gap-1.5 font-bold mb-1 text-rose-950">
+                <XCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                <span>Document Scanning Discrepancy</span>
+              </div>
+              <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-rose-800 font-medium">
                 {document.mismatches.map((m, idx) => (
                   <li key={idx}>{m}</li>
                 ))}
               </ul>
             </div>
-          )}
+          ) : null}
 
           {/* Extracted Key-Value Drawer */}
           {showExtractedPreview && (
@@ -301,6 +508,13 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
           )}
         </div>
       ) : null}
+
+      {showFullDocModal && document && (
+        <DocumentViewerModal
+          document={document}
+          onClose={() => setShowFullDocModal(false)}
+        />
+      )}
     </div>
   );
 };

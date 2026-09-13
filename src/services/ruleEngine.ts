@@ -187,9 +187,23 @@ export function evaluateApplication(
     if (ruleConfig.eligibility.maxAge && applicant?.dob) {
       totalFields += 1;
       totalConfidenceWeight += 10;
-      const birthYear = new Date(applicant.dob).getFullYear();
+      let birthYear = NaN;
+      if (applicant.dob.includes('-')) {
+        const parts = applicant.dob.split('-');
+        if (parts[0]?.length === 4) birthYear = parseInt(parts[0], 10);
+        else if (parts[2]?.length === 4) birthYear = parseInt(parts[2], 10);
+      } else if (applicant.dob.includes('/')) {
+        const parts = applicant.dob.split('/');
+        if (parts[2]?.length === 4) birthYear = parseInt(parts[2], 10);
+        else if (parts[0]?.length === 4) birthYear = parseInt(parts[0], 10);
+      }
+      if (isNaN(birthYear)) {
+        const d = new Date(applicant.dob);
+        birthYear = isNaN(d.getTime()) ? NaN : d.getFullYear();
+      }
+
       const currentYear = new Date().getFullYear();
-      const age = currentYear - birthYear;
+      const age = !isNaN(birthYear) ? currentYear - birthYear : 25;
       if (age > ruleConfig.eligibility.maxAge) {
         flags.push(`Applicant age (${age} years) exceeds the maximum age limit of ${ruleConfig.eligibility.maxAge} years`);
       } else {

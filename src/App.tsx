@@ -11,7 +11,9 @@ import {
   Database,
   Sparkles,
   RotateCcw,
-  GraduationCap
+  GraduationCap,
+  XCircle,
+  Building2
 } from 'lucide-react';
 import { 
   Application, 
@@ -43,6 +45,8 @@ import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { MeritRankingView } from './components/MeritRankingView';
 import { RuleEngineConfigView } from './components/RuleEngineConfigView';
 import { DemoScenariosModal } from './components/DemoScenariosModal';
+import { RejectionDesk } from './components/RejectionDesk';
+import { FieldVerificationDesk } from './components/FieldVerificationDesk';
 import { TribalHeritageGallery } from './components/TribalHeritageGallery';
 import { ArohaMitraBot } from './components/ArohaMitraBot';
 import { useLanguage } from './context/LanguageContext';
@@ -56,7 +60,7 @@ export default function App() {
   // Primary State
   const [role, setRole] = useState<UserRole>('applicant');
   const [applicantTab, setApplicantTab] = useState<'apply' | 'track' | 'guidelines'>('apply');
-  const [adminTab, setAdminTab] = useState<'scrutiny' | 'analytics' | 'merit' | 'rules'>('scrutiny');
+  const [adminTab, setAdminTab] = useState<'scrutiny' | 'rejections' | 'field_verification' | 'merit' | 'analytics' | 'rules'>('scrutiny');
 
   // Authentication & Tribal Atmosphere State
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => AuthService.getCurrentUser());
@@ -254,6 +258,27 @@ export default function App() {
     setApplications(updated);
     await StorageEngine.saveApplications(updated);
     addToast('info', 'Application Rejected', `Application marked as rejected on statutory grounds.`);
+  };
+
+  const handleRejectWithStatutoryClause = async (appId: string, clauseCode: string, fullRemarks: string) => {
+    const updated = applications.map((app) => {
+      if (app.id !== appId) return app;
+      return {
+        ...app,
+        status: 'rejected' as const,
+        scrutiny: {
+          verifiedBy: currentUser?.name || 'MoTA Scrutiny Officer (Desk-IV)',
+          reviewedAt: new Date().toISOString(),
+          decision: 'rejected' as const,
+          remarks: fullRemarks,
+        },
+        updatedAt: new Date().toISOString(),
+      };
+    });
+
+    setApplications(updated);
+    await StorageEngine.saveApplications(updated);
+    addToast('info', 'Statutory Rejection Registered', `Application rejected under Clause [${clauseCode}]. Formal Rejection Memo generated.`);
   };
 
   // Re-evaluate all applications with updated rules
@@ -553,7 +578,7 @@ export default function App() {
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
                 {/* Scrutiny Portal Scope Badge */}
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-amber-900/10 text-amber-950 text-xs font-extrabold uppercase tracking-wide mr-1 shrink-0 border border-amber-800/15">
                   <ShieldCheck className="w-3.5 h-3.5 text-amber-700" />
@@ -563,33 +588,49 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setAdminTab('scrutiny')}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
                     adminTab === 'scrutiny'
                       ? 'bg-amber-800 text-white shadow-xs'
                       : 'text-amber-950 hover:text-amber-800 hover:bg-amber-50'
                   }`}
                 >
                   <ShieldCheck className="w-4 h-4" />
-                  <span>{t('tabScrutiny')}</span>
+                  <span>Scrutiny Queue</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setAdminTab('analytics')}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
-                    adminTab === 'analytics'
+                  onClick={() => setAdminTab('rejections')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                    adminTab === 'rejections'
+                      ? 'bg-rose-800 text-white shadow-xs'
+                      : 'text-rose-950 hover:text-rose-800 hover:bg-rose-50'
+                  }`}
+                >
+                  <XCircle className="w-4 h-4 text-rose-500" />
+                  <span>Statutory Rejections</span>
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${adminTab === 'rejections' ? 'bg-rose-950 text-white' : 'bg-rose-100 text-rose-800'}`}>
+                    {applications.filter((a) => a.status === 'rejected').length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('field_verification')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                    adminTab === 'field_verification'
                       ? 'bg-amber-800 text-white shadow-xs'
                       : 'text-amber-950 hover:text-amber-800 hover:bg-amber-50'
                   }`}
                 >
-                  <BarChart3 className="w-4 h-4" />
-                  <span>{t('tabAnalytics')}</span>
+                  <Building2 className="w-4 h-4" />
+                  <span>Field Verification Desk</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setAdminTab('merit')}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
                     adminTab === 'merit'
                       ? 'bg-amber-800 text-white shadow-xs'
                       : 'text-amber-950 hover:text-amber-800 hover:bg-amber-50'
@@ -601,8 +642,21 @@ export default function App() {
 
                 <button
                   type="button"
+                  onClick={() => setAdminTab('analytics')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                    adminTab === 'analytics'
+                      ? 'bg-amber-800 text-white shadow-xs'
+                      : 'text-amber-950 hover:text-amber-800 hover:bg-amber-50'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>{t('tabAnalytics')}</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setAdminTab('rules')}
-                  className={`flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl transition cursor-pointer whitespace-nowrap ${
                     adminTab === 'rules'
                       ? 'bg-amber-800 text-white shadow-xs'
                       : 'text-amber-950 hover:text-amber-800 hover:bg-amber-50'
@@ -672,6 +726,24 @@ export default function App() {
               <ScrutinyQueue
                 applications={applications}
                 onOpenScrutiny={(app) => setScrutinyModalApp(app)}
+                onRejectApplication={handleRejectWithStatutoryClause}
+                onApproveApplication={handleApproveFromScrutiny}
+              />
+            )}
+
+            {adminTab === 'rejections' && (
+              <RejectionDesk
+                applications={applications}
+                onOpenApplication={(app) => setScrutinyModalApp(app)}
+                onRejectApplication={handleRejectWithStatutoryClause}
+              />
+            )}
+
+            {adminTab === 'field_verification' && (
+              <FieldVerificationDesk
+                applications={applications}
+                onOpenApplication={(app) => setScrutinyModalApp(app)}
+                onToast={addToast}
               />
             )}
 

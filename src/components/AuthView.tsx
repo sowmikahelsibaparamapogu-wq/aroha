@@ -18,6 +18,7 @@ import { DEMO_APPLICANTS, DEMO_ADMINS } from '../services/authService';
 import { useLanguage } from '../context/LanguageContext';
 import { SUPPORTED_LANGUAGES } from '../utils/translations';
 import { Avatar } from './Avatar';
+import forestBg from '../assets/images/forest_aesthetic_bg_1789233091232.jpg';
 
 interface AuthViewProps {
   onLogin: (user: AuthUser) => void;
@@ -95,26 +96,26 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
 
   return (
     <div className="relative min-h-screen flex flex-col justify-between overflow-x-hidden font-sans text-slate-900">
-      {/* Real Tribal Photographic Cover Background Layer with Soft Light Overlay */}
+      {/* Real Forest Aesthetic Photographic Full Background Layer */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <img
-          src="https://images.unsplash.com/photo-1609137144822-45e3f436d6c7?auto=format&fit=crop&w=2400&q=85"
-          alt="Indian Indigenous Folk Art and Cultural Motifs"
+          src={forestBg}
+          alt="Lush tribal green forest aesthetic with sunlight canopy and morning mist"
           referrerPolicy="no-referrer"
-          className="w-full h-full object-cover object-center filter brightness-95 contrast-105 saturate-120 opacity-30"
+          className="w-full h-full object-cover object-center filter brightness-95 contrast-105 saturate-115 scale-105 transition-transform duration-1000"
         />
-        {/* Crisp White Translucent Wash Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-white/95 via-[#F8FAF9]/92 to-white/96 backdrop-blur-[1.5px]" />
+        {/* Deep Emerald Forest Vignette & Balanced Contrast Wash */}
+        <div className="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-emerald-950/45 to-slate-950/80 backdrop-blur-[1.5px]" />
         
         {/* Subtle Decorative Geometric Tribal Border Motif */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-800 via-amber-500 to-emerald-800 shadow-xs" />
-        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-600 via-emerald-700 to-amber-600 shadow-xs" />
+        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 via-amber-400 to-emerald-500 shadow-md" />
+        <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 via-emerald-400 to-amber-500 shadow-md" />
       </div>
 
       {/* Top Bar: Official Branding & Multilingual Switcher */}
       <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-800 text-amber-300 p-0.5 shadow-md flex items-center justify-center">
+        <div className="flex items-center gap-3 bg-white/95 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/40 shadow-lg">
+          <div className="w-11 h-11 rounded-2xl bg-emerald-800 text-amber-300 p-0.5 shadow-md flex items-center justify-center shrink-0">
             <div className="w-full h-full bg-emerald-900 rounded-[14px] flex items-center justify-center">
               <span className="text-xl font-black text-amber-300">अ</span>
             </div>
@@ -142,7 +143,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
           <button
             type="button"
             onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 text-xs font-semibold shadow-xs transition cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/95 backdrop-blur-md hover:bg-white text-slate-800 border border-white/40 text-xs font-semibold shadow-lg transition cursor-pointer"
           >
             <Globe className="w-3.5 h-3.5 text-emerald-700" />
             <span>{currentLangObj.nativeName}</span>
@@ -179,15 +180,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
       {/* Main Authentication Container */}
       <main className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6 flex-1 flex flex-col justify-center">
         {/* Cultural Welcome Header & Clear Question At Start */}
-        <div className="text-center max-w-2xl mx-auto mb-6">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold mb-3 shadow-2xs">
-            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+        <div className="text-center max-w-2xl mx-auto mb-6 bg-slate-950/65 backdrop-blur-md px-6 py-4 rounded-3xl border border-emerald-500/20 shadow-xl text-white">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-bold mb-2.5 shadow-2xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
             <span>National Tribal Fellowship & Higher Education Mission</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-snug">
+          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight leading-snug">
             Which portal would you like to access?
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 mt-1.5">
+          <p className="text-xs sm:text-sm text-slate-200 mt-1">
             Select your designated portal below to proceed with your authentication credentials.
           </p>
         </div>
@@ -198,10 +199,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
           <button
             type="button"
             onClick={() => setActiveTab('applicant')}
-            className={`relative text-left p-5 rounded-2xl border-2 transition-all cursor-pointer shadow-xs ${
+            className={`relative text-left p-5 rounded-2xl border-2 transition-all cursor-pointer shadow-lg backdrop-blur-md ${
               activeTab === 'applicant'
-                ? 'bg-white border-emerald-700 shadow-md ring-2 ring-emerald-600/20'
-                : 'bg-white/80 hover:bg-white border-slate-200 hover:border-emerald-300'
+                ? 'bg-white/98 border-emerald-500 shadow-xl ring-2 ring-emerald-500/30'
+                : 'bg-white/90 hover:bg-white border-white/60 hover:border-emerald-400'
             }`}
           >
             {activeTab === 'applicant' && (
@@ -224,10 +225,10 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
           <button
             type="button"
             onClick={() => setActiveTab('admin')}
-            className={`relative text-left p-5 rounded-2xl border-2 transition-all cursor-pointer shadow-xs ${
+            className={`relative text-left p-5 rounded-2xl border-2 transition-all cursor-pointer shadow-lg backdrop-blur-md ${
               activeTab === 'admin'
-                ? 'bg-white border-amber-700 shadow-md ring-2 ring-amber-600/20'
-                : 'bg-white/80 hover:bg-white border-slate-200 hover:border-amber-300'
+                ? 'bg-white/98 border-amber-500 shadow-xl ring-2 ring-amber-500/30'
+                : 'bg-white/90 hover:bg-white border-white/60 hover:border-amber-400'
             }`}
           >
             {activeTab === 'admin' && (
@@ -248,7 +249,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
         </div>
 
         {/* Crisp White Login Card */}
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200 shadow-xl max-w-4xl mx-auto w-full">
+        <div className="bg-white/98 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white/60 shadow-2xl max-w-4xl mx-auto w-full">
           {activeTab === 'applicant' ? (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
               {/* Left Column: Applicant Form */}
@@ -528,13 +529,13 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
         </div>
 
         {/* Quick Explore as Guest for Selected Portal */}
-        <div className="mt-5 text-center flex items-center justify-center gap-4 text-xs text-slate-600">
+        <div className="mt-5 text-center flex items-center justify-center gap-4 text-xs text-slate-100 bg-slate-950/65 backdrop-blur-md py-2 px-5 rounded-2xl border border-white/20 w-fit mx-auto shadow-md">
           <span>Just exploring?</span>
           {activeTab === 'applicant' ? (
             <button
               type="button"
               onClick={() => onExploreAsGuest('applicant')}
-              className="text-emerald-800 hover:text-emerald-900 font-bold hover:underline cursor-pointer"
+              className="text-emerald-300 hover:text-emerald-200 font-bold hover:underline cursor-pointer"
             >
               Enter Application Portal as Guest Scholar →
             </button>
@@ -542,7 +543,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
             <button
               type="button"
               onClick={() => onExploreAsGuest('admin')}
-              className="text-amber-800 hover:text-amber-900 font-bold hover:underline cursor-pointer"
+              className="text-amber-300 hover:text-amber-200 font-bold hover:underline cursor-pointer"
             >
               Enter Scrutiny Portal as Guest Officer →
             </button>
@@ -551,15 +552,15 @@ export const AuthView: React.FC<AuthViewProps> = ({ onLogin, onExploreAsGuest, i
       </main>
 
       {/* Footer: Statutory Footnote & Cultural Tribute */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-600 bg-white/70 backdrop-blur-xs">
+      <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 border-t border-white/15 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-200 bg-slate-950/75 backdrop-blur-md rounded-t-2xl shadow-lg">
         <div className="flex items-center gap-2">
           <span>© 2025 Ministry of Tribal Affairs (MoTA), Government of India</span>
           <span>•</span>
-          <span className="text-emerald-800 font-semibold">National Tribal Welfare Portal</span>
+          <span className="text-emerald-300 font-semibold">National Tribal Welfare Portal</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-slate-500">Celebrating Indigenous Artistry & Heritage:</span>
-          <span className="text-emerald-800 font-medium">Warli • Gond • Santhal • Dokra • Saura</span>
+          <span className="text-slate-300">Celebrating Indigenous Artistry & Heritage:</span>
+          <span className="text-amber-300 font-medium">Warli • Gond • Santhal • Dokra • Saura</span>
         </div>
       </footer>
     </div>

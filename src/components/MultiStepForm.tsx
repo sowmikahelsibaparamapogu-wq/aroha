@@ -18,8 +18,14 @@ import {
 import { Application, DocumentUpload, SchemeType } from '../types/scholarship';
 import { DocumentUploadCard } from './DocumentUploadCard';
 import { DEFAULT_SCHEME_RULES, evaluateApplication } from '../services/ruleEngine';
+import { matchAllDocumentsWithEnteredFields, DocumentFieldMatchResult } from '../services/fieldMatcher';
 import { StorageEngine } from '../services/storage';
 import { useLanguage } from '../context/LanguageContext';
+import { DateOfBirthInput } from './DateOfBirthInput';
+import {
+  ALL_INDIAN_STATES_AND_UTS,
+  INDIAN_ADMINISTRATIVE_DIVISIONS,
+} from '../data/indianStates';
 
 interface MultiStepFormProps {
   initialScheme?: SchemeType;
@@ -47,21 +53,7 @@ const ST_COMMUNITIES = [
   'Angami Naga',
 ];
 
-const STATES_LIST = [
-  'Jharkhand',
-  'Odisha',
-  'Madhya Pradesh',
-  'Chhattisgarh',
-  'Telangana',
-  'Andhra Pradesh',
-  'Meghalaya',
-  'Assam',
-  'Rajasthan',
-  'Gujarat',
-  'Maharashtra',
-  'Nagaland',
-  'Tripura',
-];
+const STATES_LIST = ALL_INDIAN_STATES_AND_UTS;
 
 export const MultiStepForm: React.FC<MultiStepFormProps> = ({
   initialScheme = 'NFST',
@@ -322,6 +314,26 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
     },
     documents,
   };
+
+  const documentMatchResults: DocumentFieldMatchResult[] = matchAllDocumentsWithEnteredFields(
+    {
+      fullName: formData.fullName || '',
+      fatherName: formData.fatherName,
+      stCommunity: formData.stCommunity,
+      state: formData.state,
+      district: formData.district,
+      annualFamilyIncome: Number(formData.annualFamilyIncome),
+      qualifyingPercentage: Number(formData.qualifyingPercentage),
+      ugcNetRollNo: formData.ugcNetRollNo,
+      offerStatus: formData.offerStatus,
+      qsWorldRanking: Number(formData.qsWorldRanking),
+      scheme,
+    },
+    documents
+  );
+
+  const hasAnyScanMismatchError = documentMatchResults.some((r) => r.hasErrors);
+  const totalScanErrorsCount = documentMatchResults.reduce((acc, r) => acc + r.errorCount, 0);
 
   const evaluation = evaluateApplication(partialApp, DEFAULT_SCHEME_RULES[scheme]);
 
@@ -1047,19 +1059,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  {t('dob')} <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="date"
+                <DateOfBirthInput
                   value={formData.dob}
-                  onChange={(e) => handleInputChange('dob', e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  onChange={(val) => handleInputChange('dob', val)}
+                  scheme={scheme}
+                  label={t('dob')}
                   required
                 />
-                {scheme === 'NOS' && (
-                  <p className="text-[11px] text-slate-400 mt-1">Age ceiling: 35 years as on 1st July 2025</p>
-                )}
               </div>
 
               <div>
@@ -1082,13 +1088,48 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                 </label>
                 <select
                   value={formData.state}
-                  onChange={(e) => handleInputChange('state', e.target.value)}
-                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer"
+                  onChange={(e) => {
+                    const st = e.target.value;
+                    handleInputChange('state', st);
+                    if (!formData.domicileState || formData.domicileState === formData.state) {
+                      handleInputChange('domicileState', st);
+                    }
+                  }}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer font-medium"
+                  required
                 >
-                  {STATES_LIST.map((st) => (
-                    <option key={st} value={st}>
-                      {st}
-                    </option>
+                  <option value="">-- Select State / Union Territory (36) --</option>
+                  {INDIAN_ADMINISTRATIVE_DIVISIONS.map((div) => (
+                    <optgroup key={div.group} label={div.group}>
+                      {div.items.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  {t('domicileState')} <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={formData.domicileState || formData.state}
+                  onChange={(e) => handleInputChange('domicileState', e.target.value)}
+                  className="w-full px-3.5 py-2 text-xs rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white cursor-pointer font-medium"
+                  required
+                >
+                  <option value="">-- Select Domicile State / UT (36) --</option>
+                  {INDIAN_ADMINISTRATIVE_DIVISIONS.map((div) => (
+                    <optgroup key={div.group} label={div.group}>
+                      {div.items.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>
@@ -1404,14 +1445,68 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
               </div>
             </div>
 
+            {/* Global Document Mismatch Error Banner if any document failed matching */}
+            {hasAnyScanMismatchError && (
+              <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-400 text-rose-950 space-y-3 animate-in fade-in">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-black flex-shrink-0">
+                      <AlertTriangle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xs uppercase tracking-wider text-rose-950">
+                        CRITICAL SCAN ERROR: ENTERED APPLICATION FIELDS DO NOT MATCH DOCUMENTS
+                      </h4>
+                      <p className="text-[11px] text-rose-800 font-medium">
+                        Found {totalScanErrorsCount} mismatch error{totalScanErrorsCount > 1 ? 's' : ''} across your uploaded documents. Documents must strictly match the entered details.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-md bg-rose-200 text-rose-900 font-extrabold text-[10px] uppercase border border-rose-300">
+                    Action Required
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {documentMatchResults
+                    .filter((r) => r.hasErrors)
+                    .map((res, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded-lg border border-rose-200 text-xs space-y-1.5 shadow-xs">
+                        <div className="flex items-center justify-between font-bold text-rose-900 border-b border-rose-100 pb-1">
+                          <span>📄 {res.documentName}</span>
+                          <span className="text-[10px] font-mono uppercase bg-rose-100 px-2 py-0.5 rounded text-rose-800">
+                            {res.errorCount} Error{res.errorCount > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        <ul className="space-y-1">
+                          {res.errorMessages.map((msg, mIdx) => (
+                            <li key={mIdx} className="text-[11px] text-rose-800 font-semibold flex items-start gap-1.5">
+                              <span className="text-rose-600 font-bold shrink-0">❌</span>
+                              <span>{msg}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                </div>
+
+                <p className="text-[11px] text-rose-900 font-medium">
+                  💡 <strong>How to fix:</strong> Either edit your entered form details in Steps 1-3 to match your official certificates, or remove the incorrect document and upload the matching valid copy.
+                </p>
+              </div>
+            )}
+
             <DocumentUploadCard
               docType="caste_certificate"
               title={t('docTypeCaste')}
               description="Official certificate issued by competent revenue authority (SDM/Tehsildar) with digital QR code or e-District barcode."
               scheme={scheme}
               applicantName={formData.fullName}
+              fatherName={formData.fatherName}
               stCommunity={formData.stCommunity}
               annualIncome={Number(formData.annualFamilyIncome)}
+              qualifyingPercentage={Number(formData.qualifyingPercentage)}
+              state={formData.state}
               document={documents.find((d) => d.type === 'caste_certificate')}
               onUploadComplete={handleDocumentUploaded}
               onRemove={handleDocumentRemoved}
@@ -1425,7 +1520,11 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                 description="Valid income certificate issued by competent authority for current FY (statutory limit ₹8,00,000)."
                 scheme={scheme}
                 applicantName={formData.fullName}
+                fatherName={formData.fatherName}
+                stCommunity={formData.stCommunity}
                 annualIncome={Number(formData.annualFamilyIncome)}
+                qualifyingPercentage={Number(formData.qualifyingPercentage)}
+                state={formData.state}
                 document={documents.find((d) => d.type === 'income_certificate')}
                 onUploadComplete={handleDocumentUploaded}
                 onRemove={handleDocumentRemoved}
@@ -1439,6 +1538,11 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
               description="Marksheet showing marks in qualifying degree (minimum 55% for Scheduled Tribe candidates)."
               scheme={scheme}
               applicantName={formData.fullName}
+              fatherName={formData.fatherName}
+              stCommunity={formData.stCommunity}
+              annualIncome={Number(formData.annualFamilyIncome)}
+              qualifyingPercentage={Number(formData.qualifyingPercentage)}
+              state={formData.state}
               document={documents.find((d) => d.type === 'marksheet')}
               onUploadComplete={handleDocumentUploaded}
               onRemove={handleDocumentRemoved}
@@ -1452,6 +1556,11 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                 description="Official NTA score card or bonafide certificate from University Head of Department confirming enrollment."
                 scheme={scheme}
                 applicantName={formData.fullName}
+                fatherName={formData.fatherName}
+                stCommunity={formData.stCommunity}
+                annualIncome={Number(formData.annualFamilyIncome)}
+                qualifyingPercentage={Number(formData.qualifyingPercentage)}
+                state={formData.state}
                 document={documents.find((d) => d.type === 'bonafide_certificate')}
                 onUploadComplete={handleDocumentUploaded}
                 onRemove={handleDocumentRemoved}
@@ -1465,6 +1574,13 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                   description="Formal letter confirming unconditional admission into top 500 QS ranked university."
                   scheme={scheme}
                   applicantName={formData.fullName}
+                  fatherName={formData.fatherName}
+                  stCommunity={formData.stCommunity}
+                  annualIncome={Number(formData.annualFamilyIncome)}
+                  qualifyingPercentage={Number(formData.qualifyingPercentage)}
+                  state={formData.state}
+                  offerStatus={formData.offerStatus}
+                  qsWorldRanking={Number(formData.qsWorldRanking)}
                   document={documents.find((d) => d.type === 'offer_letter')}
                   onUploadComplete={handleDocumentUploaded}
                   onRemove={handleDocumentRemoved}
@@ -1477,6 +1593,11 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                   description="Front and back pages of passport valid for at least 6 months beyond intended departure."
                   scheme={scheme}
                   applicantName={formData.fullName}
+                  fatherName={formData.fatherName}
+                  stCommunity={formData.stCommunity}
+                  annualIncome={Number(formData.annualFamilyIncome)}
+                  qualifyingPercentage={Number(formData.qualifyingPercentage)}
+                  state={formData.state}
                   document={documents.find((d) => d.type === 'passport')}
                   onUploadComplete={handleDocumentUploaded}
                   onRemove={handleDocumentRemoved}
@@ -1490,6 +1611,50 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
         {/* Step 5: Review & AI Eligibility Verdict */}
         {currentStep === 5 && (
           <div className="space-y-6">
+            {/* Scan Mismatch Error Warning Alert */}
+            {hasAnyScanMismatchError && (
+              <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-400 text-rose-950 space-y-2.5 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center font-black">
+                      <ShieldAlert className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="font-extrabold text-xs uppercase tracking-wider text-rose-950">
+                        SCAN ERROR: UNRESOLVED DOCUMENT FIELD MISMATCHES
+                      </h4>
+                      <p className="text-[11px] text-rose-800 font-medium">
+                        {totalScanErrorsCount} critical discrepancy detected between your entered fields and scanned certificates.
+                      </p>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded bg-rose-200 text-rose-900 font-black text-[10px] uppercase">
+                    Blocking Issue
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
+                  {documentMatchResults
+                    .filter((r) => r.hasErrors)
+                    .map((res, i) => (
+                      <div key={i} className="bg-white p-2.5 rounded-lg border border-rose-200 shadow-xs">
+                        <span className="font-bold text-rose-950 block text-[11px] mb-1">
+                          📄 {res.documentName}:
+                        </span>
+                        {res.errorMessages.map((e, ei) => (
+                          <p key={ei} className="text-rose-800 text-[10.5px] font-semibold flex items-start gap-1">
+                            <span className="text-rose-600 shrink-0">❌</span>
+                            <span>{e}</span>
+                          </p>
+                        ))}
+                      </div>
+                    ))}
+                </div>
+                <div className="p-2 rounded bg-rose-100/60 text-[11px] text-rose-900 font-semibold">
+                  ⚠️ Note: Submitting this application will route it directly to the Scrutinizer with flagged statutory mismatch errors.
+                </div>
+              </div>
+            )}
+
             {/* AI Eligibility Result Summary Box */}
             <div className={`p-5 rounded-xl border ${
               evaluation.passed
@@ -1559,6 +1724,10 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                 <div className="flex justify-between">
                   <span className="text-slate-500">{t('stateOfResidence')}:</span>
                   <span className="font-semibold text-slate-900">{formData.state}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">{t('domicileState')}:</span>
+                  <span className="font-semibold text-slate-900">{formData.domicileState || formData.state}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">{t('annualFamilyIncome')}:</span>

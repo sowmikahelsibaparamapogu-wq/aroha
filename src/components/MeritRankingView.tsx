@@ -13,6 +13,7 @@ import {
 import { Application, SchemeType } from '../types/scholarship';
 import { useLanguage } from '../context/LanguageContext';
 import { Avatar } from './Avatar';
+import { INDIAN_ADMINISTRATIVE_DIVISIONS } from '../data/indianStates';
 
 interface MeritRankingViewProps {
   applications: Application[];
@@ -26,6 +27,7 @@ export const MeritRankingView: React.FC<MeritRankingViewProps> = ({
   const { t } = useLanguage();
   const [selectedScheme, setSelectedScheme] = useState<SchemeType>('NFST');
   const [searchTerm, setSearchTerm] = useState('');
+  const [stateFilter, setStateFilter] = useState<string>('ALL');
 
   const schemeSlotLimits: Record<SchemeType, number> = {
     NFST: 750,
@@ -41,11 +43,17 @@ export const MeritRankingView: React.FC<MeritRankingViewProps> = ({
       return scoreB - scoreA;
     });
 
-  const filteredRanked = rankedApps.filter((a) =>
-    a.applicant.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.applicant.stCommunity.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.applicant.state.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRanked = rankedApps.filter((a) => {
+    const matchesSearch =
+      a.applicant.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.applicant.stCommunity.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      a.applicant.state.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesState =
+      stateFilter === 'ALL' ||
+      a.applicant.state.toLowerCase() === stateFilter.toLowerCase() ||
+      a.applicant.domicileState?.toLowerCase() === stateFilter.toLowerCase();
+    return matchesSearch && matchesState;
+  });
 
   const slotLimit = schemeSlotLimits[selectedScheme];
   const femaleCount = rankedApps.slice(0, slotLimit).filter((a) => a.applicant.gender === 'Female').length;
@@ -122,16 +130,36 @@ export const MeritRankingView: React.FC<MeritRankingViewProps> = ({
         </div>
       </div>
 
-      {/* Search Filter */}
-      <div className="relative w-full max-w-sm">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder={t('filterRankedCandidates', 'Filter ranked candidates...')}
-          className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      {/* Search & State Filter */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="relative w-full max-w-sm">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={t('filterRankedCandidates', 'Filter ranked candidates...')}
+            className="w-full pl-10 pr-4 py-2 text-xs rounded-xl border border-slate-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <select
+          value={stateFilter}
+          onChange={(e) => setStateFilter(e.target.value)}
+          className="px-3 py-2 text-xs font-semibold rounded-xl border border-slate-300 bg-white cursor-pointer"
+          title="Filter by State / UT"
+        >
+          <option value="ALL">All States / UTs (36)</option>
+          {INDIAN_ADMINISTRATIVE_DIVISIONS.map((div) => (
+            <optgroup key={div.group} label={div.group}>
+              {div.items.map((st) => (
+                <option key={st} value={st}>
+                  {st}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
       </div>
 
       {/* Merit List Table */}

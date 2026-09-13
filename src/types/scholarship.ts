@@ -49,6 +49,7 @@ export interface DocumentUpload {
   size: number;
   uploadedAt: string;
   dataUrl?: string; // For offline storage and preview
+  rawText?: string; // Raw extracted OCR / text stream
   ocrStatus: 'idle' | 'processing' | 'verified' | 'mismatch' | 'flagged';
   ocrConfidence: number; // 0 to 100
   extractedFields: Record<string, string | number>;
