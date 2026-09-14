@@ -263,7 +263,7 @@ export const FieldVerificationDesk: React.FC<FieldVerificationDeskProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredInspections.map((item) => (
+              {(filteredInspections || []).map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/60 transition">
                   <td className="py-3.5 px-5">
                     <span className="font-bold text-slate-900 block">{item.candidateName}</span>
@@ -373,7 +373,7 @@ export const FieldVerificationDesk: React.FC<FieldVerificationDeskProps> = ({
                   onChange={(e) => setSelectedAppId(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 focus:bg-white text-xs"
                 >
-                  {applications.map((app) => (
+                  {(applications || []).map((app) => (
                     <option key={app.id} value={app.id}>
                       {app.applicant.fullName} ({app.applicationNumber} • {app.applicant.district}, {app.applicant.state})
                     </option>

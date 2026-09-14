@@ -161,7 +161,7 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({
             onChange={(e) => onSelectApplication(e.target.value)}
             className="px-3 py-1.5 text-xs font-medium rounded-xl border border-slate-300 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
           >
-            {applications.map((app) => (
+            {(applications || []).map((app) => (
               <option key={app.id} value={app.id}>
                 {app.applicationNumber} - {app.applicant.fullName} ({app.status})
               </option>
@@ -193,7 +193,7 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({
 
               {/* Deficiency items */}
               <div className="mt-4 space-y-3">
-                {currentApp.deficiencies.map((def) => (
+                {(currentApp.deficiencies || []).map((def) => (
                   <div key={def.id} className="p-4 rounded-xl bg-white border border-orange-200">
                     <div className="flex items-center justify-between">
                       <h5 className="text-xs font-bold text-slate-900">{def.title}</h5>
@@ -375,7 +375,7 @@ export const StatusTracker: React.FC<StatusTrackerProps> = ({
           </div>
 
           <div className="space-y-3">
-            {currentApp.dbtDisbursements.map((tranche) => (
+            {(currentApp.dbtDisbursements || []).map((tranche) => (
               <div
                 key={tranche.trancheNumber}
                 className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3"

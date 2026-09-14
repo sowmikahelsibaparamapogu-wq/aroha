@@ -330,19 +330,19 @@ export const ScrutinyModal: React.FC<ScrutinyModalProps> = ({
                           <div>
                             <span className="text-[10px] text-slate-500 uppercase font-bold block">Candidate Name:</span>
                             <span className="font-bold text-slate-900 font-mono truncate block">
-                              {currentDoc.extractedFields['Candidate Name'] || currentDoc.extractedFields['Applicant Name in Document'] || application.applicant.fullName}
+                              {currentDoc.extractedFields?.['Candidate Name'] || currentDoc.extractedFields?.['Applicant Name in Document'] || application.applicant.fullName}
                             </span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 uppercase font-bold block">Issuing Authority:</span>
                             <span className="font-semibold text-slate-800 truncate block">
-                              {currentDoc.extractedFields['Issuing Authority'] || 'Competent Authority'}
+                              {currentDoc.extractedFields?.['Issuing Authority'] || 'Competent Authority'}
                             </span>
                           </div>
                           <div>
                             <span className="text-[10px] text-slate-500 uppercase font-bold block">Certificate / Ref ID:</span>
                             <span className="font-mono text-slate-800 truncate block">
-                              {currentDoc.extractedFields['Certificate Number'] || currentDoc.extractedFields['Roll / Registration No'] || currentDoc.id.slice(0, 14)}
+                              {currentDoc.extractedFields?.['Certificate Number'] || currentDoc.extractedFields?.['Roll / Registration No'] || currentDoc.id.slice(0, 14)}
                             </span>
                           </div>
                           <div>
@@ -392,7 +392,7 @@ export const ScrutinyModal: React.FC<ScrutinyModalProps> = ({
                       <span>{t('aiDetectedDiscrepancy', 'AI Detected Discrepancy:')}</span>
                     </div>
                     <ul className="list-disc pl-4 space-y-0.5 text-[11px] text-orange-900">
-                      {currentDoc.mismatches.map((m, i) => (
+                      {(currentDoc.mismatches || []).map((m, i) => (
                         <li key={i}>{m}</li>
                       ))}
                     </ul>
@@ -431,7 +431,7 @@ export const ScrutinyModal: React.FC<ScrutinyModalProps> = ({
                 </span>
               </div>
 
-              {currentDocMatch && currentDocMatch.fieldComparisons.length > 0 ? (
+              {currentDocMatch && currentDocMatch.fieldComparisons && currentDocMatch.fieldComparisons.length > 0 ? (
                 <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
                   <table className="w-full text-[11px] text-left">
                     <thead className="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
@@ -443,7 +443,7 @@ export const ScrutinyModal: React.FC<ScrutinyModalProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {currentDocMatch.fieldComparisons.map((cmp, idx) => (
+                      {(currentDocMatch.fieldComparisons || []).map((cmp, idx) => (
                         <tr key={idx} className={cmp.isMatch ? 'bg-white' : 'bg-rose-50/80 font-semibold'}>
                           <td className="py-1.5 px-2 text-slate-700">{cmp.fieldLabel}</td>
                           <td className="py-1.5 px-2 text-slate-900 font-mono">
@@ -483,7 +483,7 @@ export const ScrutinyModal: React.FC<ScrutinyModalProps> = ({
 
               {currentDocMatch?.hasErrors && (
                 <div className="space-y-1.5 pt-1">
-                  {currentDocMatch.errorMessages.map((msg, idx) => (
+                  {(currentDocMatch.errorMessages || []).map((msg, idx) => (
                     <div key={idx} className="p-2 rounded bg-rose-100 border border-rose-300 text-rose-950 text-[11px] font-medium flex items-start gap-1.5">
                       <span className="font-bold text-rose-700 shrink-0">ERROR {idx + 1}:</span>
                       <span>{msg}</span>
@@ -494,7 +494,7 @@ export const ScrutinyModal: React.FC<ScrutinyModalProps> = ({
                       type="button"
                       onClick={() => {
                         setActiveTab('deficiency');
-                        setDeficiencyText(`Statutory Scan Error in ${currentDoc?.name || 'document'}: ${currentDocMatch.errorMessages.join('; ')}`);
+                        setDeficiencyText(`Statutory Scan Error in ${currentDoc?.name || 'document'}: ${(currentDocMatch.errorMessages || []).join('; ')}`);
                       }}
                       className="px-2.5 py-1 text-[10.5px] font-bold text-rose-900 bg-rose-200 hover:bg-rose-300 rounded transition cursor-pointer"
                     >

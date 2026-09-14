@@ -75,7 +75,7 @@ export default function App() {
   const [tribalAmbience, setTribalAmbience] = useState<boolean>(true);
 
   // Data State
-  const [applications, setApplications] = useState<Application[]>([]);
+  const [applications, setApplications] = useState<Application[]>(SEEDED_APPLICATIONS);
   const [rules, setRules] = useState<Record<SchemeType, SchemeRuleConfig>>(DEFAULT_SCHEME_RULES);
   const [selectedAppId, setSelectedAppId] = useState<string>('app_101');
   const [scrutinyModalApp, setScrutinyModalApp] = useState<Application | null>(null);
@@ -108,10 +108,15 @@ export default function App() {
   useEffect(() => {
     const initData = async () => {
       const storedApps = await StorageEngine.getApplications();
-      setApplications(storedApps);
+      if (storedApps && storedApps.length > 0) {
+        setApplications(storedApps);
+      } else {
+        setApplications(SEEDED_APPLICATIONS);
+        await StorageEngine.saveApplications(SEEDED_APPLICATIONS);
+      }
 
       const queued = await StorageEngine.getQueuedDocuments();
-      setQueuedDocsCount(queued.length);
+      setQueuedDocsCount(queued ? queued.length : 0);
     };
 
     initData();
@@ -179,7 +184,7 @@ export default function App() {
     const updated = applications.map((app) => {
       if (app.id !== appId) return app;
 
-      const updatedDocs = [...app.documents, replacementDoc];
+      const updatedDocs = [...(app.documents || []), replacementDoc];
       const updatedDefs = app.deficiencies?.filter((d) => d.id !== defId) || [];
 
       return {

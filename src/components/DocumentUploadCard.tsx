@@ -40,6 +40,46 @@ interface DocumentUploadCardProps {
   isOnline: boolean;
 }
 
+// Helper to synthesize a 100% syntactically valid PDF-1.4 binary file with valid xref and text streams
+function createSynthesizedPdfFile(fileName: string, title: string, lines: string[]): File {
+  const allLines = [title, ...lines];
+  const escapedLines = allLines.map((l) =>
+    l.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
+  );
+  const textCommands = escapedLines.map((l) => `(${l}) Tj T*`).join('\n');
+  const streamContent = `BT\n/F1 10 Tf\n50 720 Td\n14 TL\n${textCommands}\nET`;
+  const streamLength = new TextEncoder().encode(streamContent).length;
+
+  let pdf = `%PDF-1.4\n`;
+  const offsets: number[] = [];
+
+  // Obj 1: Catalog
+  offsets.push(new TextEncoder().encode(pdf).length);
+  pdf += `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`;
+
+  // Obj 2: Pages
+  offsets.push(new TextEncoder().encode(pdf).length);
+  pdf += `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`;
+
+  // Obj 3: Page
+  offsets.push(new TextEncoder().encode(pdf).length);
+  pdf += `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>\nendobj\n`;
+
+  // Obj 4: Stream
+  offsets.push(new TextEncoder().encode(pdf).length);
+  pdf += `4 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream\nendobj\n`;
+
+  const xrefOffset = new TextEncoder().encode(pdf).length;
+  pdf += `xref\n0 5\n0000000000 65535 f \n`;
+  for (const offset of offsets) {
+    pdf += `${offset.toString().padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+
+  const blob = new Blob([new TextEncoder().encode(pdf)], { type: 'application/pdf' });
+  return new File([blob], fileName, { type: 'application/pdf' });
+}
+
 export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
   docType,
   title,
@@ -198,10 +238,71 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
       ? `${docType}_wrong_doc_mismatched.pdf`
       : `${docType}_verified_official.pdf`;
 
-    const fakeFile = new File(['%PDF-1.5 MoTA Official Scholarship Document Sample'], fakeFileName, {
-      type: 'application/pdf',
-    });
+    let sampleTitle = 'GOVERNMENT OF INDIA - MINISTRY OF TRIBAL AFFAIRS';
+    let sampleLines: string[] = [];
 
+    if (isMismatch) {
+      sampleTitle = 'ELECTRICITY UTILITY BILL / CONSUMER INVOICE';
+      sampleLines = [
+        'Consumer Name: DEEPAK VERMA',
+        "Father's Name: SURENDRA VERMA",
+        'Consumer Account: 1092837482',
+        'Category: Commercial LT Grid Supply',
+        'Amount Due: Rs. 2,450.00',
+        'Note: Incompatible document uploaded for scholarship verification.',
+      ];
+    } else {
+      if (docType === 'caste_certificate') {
+        sampleTitle = 'GOVERNMENT OF TELANGANA - REVENUE DEPARTMENT';
+        sampleLines = [
+          'SCHEDULED TRIBE COMMUNITY CERTIFICATE',
+          `Certified that ${applicantName || 'Sowmika Helsiba Paramapogu'} S/o ${fatherName || 'P. Rameshwar'}`,
+          `belongs to ${stCommunity || 'Gond'} community which is recognized as Scheduled Tribe under Article 342.`,
+          'Issuing Authority: Sub-Divisional Magistrate (SDM), Adilabad',
+          'Digital Barcode: VALID (e-Pramaan Barcode Verified)',
+          'Status: Verified Authentic Official Document',
+        ];
+      } else if (docType === 'marksheet') {
+        sampleTitle = 'STATE BOARD OF HIGHER EDUCATION';
+        sampleLines = [
+          'STATEMENT OF MARKS / ACADEMIC CONSOLIDATED TRANSCRIPT',
+          `Candidate Name: ${(applicantName || 'Sowmika Helsiba Paramapogu').toUpperCase()}`,
+          `Father's Name: ${(fatherName || 'P. Rameshwar').toUpperCase()}`,
+          'Course: Master of Science (M.Sc)',
+          `Aggregate Percentage: ${qualifyingPercentage || 74.5}%`,
+          'Division: FIRST CLASS WITH DISTINCTION',
+          'Status: Verified Authentic Grade Card',
+        ];
+      } else if (docType === 'income_certificate') {
+        sampleTitle = 'GOVERNMENT REVENUE DEPARTMENT';
+        sampleLines = [
+          'CERTIFICATE OF ANNUAL FAMILY INCOME',
+          `This is to certify that the annual family income of ${applicantName || 'Sowmika Helsiba Paramapogu'}`,
+          `from all sources is Rs. ${annualIncome || 360000}`,
+          'Financial Year: 2024-2025',
+          'Status: Verified Authentic Income Certificate',
+        ];
+      } else if (docType === 'offer_letter') {
+        sampleTitle = 'UNIVERSITY ADMISSIONS OFFICE';
+        sampleLines = [
+          'OFFER OF ADMISSION (UNCONDITIONAL)',
+          `Candidate Name: ${applicantName || 'Sowmika Helsiba Paramapogu'}`,
+          'Degree: Ph.D. Research Program',
+          `Offer Status: ${offerStatus || 'Unconditional'}`,
+          `QS World University Ranking: #${qsWorldRanking || 28}`,
+          'Status: Verified Authentic Offer Letter',
+        ];
+      } else {
+        sampleTitle = 'OFFICIAL SCHOLARSHIP CREDENTIAL';
+        sampleLines = [
+          `Candidate Name: ${applicantName || 'Sowmika Helsiba Paramapogu'}`,
+          'Document: Verified Official Certificate',
+          'Status: Verified Authentic',
+        ];
+      }
+    }
+
+    const fakeFile = createSynthesizedPdfFile(fakeFileName, sampleTitle, sampleLines);
     handleFileProcess(fakeFile);
   };
 
@@ -408,7 +509,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
               </div>
 
               {/* Side-by-Side Field Comparison Table */}
-              {matchResult.fieldComparisons.length > 0 && (
+              {matchResult.fieldComparisons && matchResult.fieldComparisons.length > 0 && (
                 <div className="overflow-hidden rounded-lg border border-rose-200 bg-white">
                   <table className="w-full text-[11px] text-left">
                     <thead className="bg-rose-100/70 text-rose-900 font-bold border-b border-rose-200">
@@ -420,7 +521,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-rose-100 font-medium">
-                      {matchResult.fieldComparisons.map((cmp, idx) => (
+                      {(matchResult.fieldComparisons || []).map((cmp, idx) => (
                         <tr key={idx} className={cmp.isMatch ? 'bg-white' : 'bg-rose-50/70'}>
                           <td className="py-2 px-2.5 text-slate-700 font-semibold">{cmp.fieldLabel}</td>
                           <td className="py-2 px-2.5 text-slate-900 font-mono">
@@ -453,7 +554,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
 
               {/* Exact Error Messages */}
               <div className="space-y-1 pt-1">
-                {matchResult.errorMessages.map((errMsg, idx) => (
+                {(matchResult.errorMessages || []).map((errMsg, idx) => (
                   <div
                     key={idx}
                     className="p-2 rounded-lg bg-rose-100/70 border border-rose-300 text-rose-950 text-[11px] font-semibold flex items-start gap-1.5"
@@ -477,7 +578,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
                 <span>Document Scanning Discrepancy</span>
               </div>
               <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-rose-800 font-medium">
-                {document.mismatches.map((m, idx) => (
+                {(document.mismatches || []).map((m, idx) => (
                   <li key={idx}>{m}</li>
                 ))}
               </ul>
@@ -497,7 +598,7 @@ export const DocumentUploadCard: React.FC<DocumentUploadCardProps> = ({
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
-                {Object.entries(document.extractedFields).map(([k, v]) => (
+                {Object.entries(document.extractedFields || {}).map(([k, v]) => (
                   <div key={k} className="bg-white p-2 rounded border border-slate-100">
                     <span className="text-slate-400 block">{k}</span>
                     <span className="font-semibold text-slate-800">{String(v)}</span>

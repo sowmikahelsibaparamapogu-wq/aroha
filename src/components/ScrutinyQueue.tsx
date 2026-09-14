@@ -223,7 +223,7 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredApps.map((app) => {
+              {(filteredApps || []).map((app) => {
                 const confidence = app.aiAnalysis?.overallConfidence || 85;
                 const requiresReview = app.aiAnalysis?.requiresHumanReview;
                 const hasDeficiency = app.status === 'flagged_deficiency';
@@ -288,7 +288,7 @@ export const ScrutinyQueue: React.FC<ScrutinyQueueProps> = ({
                       {/* Scrutinizer Quick Document Access Chips */}
                       {app.documents && app.documents.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1.5 max-w-[200px]">
-                          {app.documents.slice(0, 3).map((d) => (
+                          {(app.documents || []).slice(0, 3).map((d) => (
                             <button
                               key={d.id}
                               type="button"

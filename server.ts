@@ -372,29 +372,82 @@ app.post('/api/scan-document', async (req, res) => {
         const base64Data = match[2];
         const buffer = Buffer.from(base64Data, 'base64');
 
-        // 1. If PDF document: Extract actual text streams using PDFParse
+        // 1. If PDF document: Extract actual text streams using PDFParse safely
         if (mimeType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf')) {
+          let parser: PDFParse | null = null;
           try {
-            const parser = new PDFParse({ data: buffer });
-            const pdfData = await parser.getText();
-            rawExtractedText = pdfData.text || '';
-            extractionMethod = 'pdf-parse';
-            await parser.destroy();
+            // Check if buffer is non-empty and has plausible PDF binary signature (%PDF-)
+            const hasPdfSignature =
+              buffer &&
+              buffer.length >= 100 &&
+              (buffer.subarray(0, 10).toString('utf-8').includes('%PDF-') ||
+                buffer.indexOf('%PDF-') !== -1);
+
+            if (hasPdfSignature) {
+              parser = new PDFParse({ data: buffer });
+              const pdfData = await parser.getText();
+              if (pdfData && typeof pdfData.text === 'string' && pdfData.text.trim().length > 0) {
+                rawExtractedText = pdfData.text.trim();
+                extractionMethod = 'pdf-parse';
+              }
+            }
           } catch (pdfErr) {
-            console.error('PDF text extraction error:', pdfErr);
+            // Graceful fallback for malformed, encrypted, or simulated text PDFs without uncaught errors
+            console.warn(
+              'PDF stream parse notice (falling back to text stream recovery):',
+              (pdfErr as Error)?.message || 'Non-standard PDF structure'
+            );
+          } finally {
+            if (parser) {
+              try {
+                await parser.destroy();
+              } catch {
+                // Ignore cleanup errors
+              }
+            }
+          }
+
+          // Resilient stream recovery: If PDFParse did not extract text, attempt raw string extraction from buffer
+          if (!rawExtractedText && buffer && buffer.length > 0) {
+            try {
+              const bufferStr = buffer.toString('utf-8');
+              // Extract text inside PDF parenthesis Tj strings: e.g. (Candidate Name: ...) Tj
+              const tjMatches = [...bufferStr.matchAll(/\(([^)\\]{2,})\)\s*Tj/g)].map((m) => m[1]);
+              if (tjMatches.length > 0) {
+                rawExtractedText = tjMatches.join(' ');
+                extractionMethod = 'pdf-stream-recovery';
+              } else {
+                // If the file is a plain text mock or text file saved with .pdf extension
+                const printable = bufferStr.replace(/[^\x20-\x7E\n\r\t]/g, ' ').replace(/\s+/g, ' ').trim();
+                if (printable.length >= 15) {
+                  rawExtractedText = printable;
+                  extractionMethod = 'pdf-ascii-recovery';
+                }
+              }
+            } catch {
+              // Ignore stream recovery error
+            }
           }
         }
 
         // 2. If Image document: Run Tesseract optical character recognition
         if (!rawExtractedText && (mimeType.startsWith('image/') || /\.(png|jpe?g|webp|bmp|gif)$/i.test(fileName))) {
+          let worker: any = null;
           try {
-            const worker = await createWorker('eng');
+            worker = await createWorker('eng');
             const ret = await worker.recognize(buffer);
             rawExtractedText = ret.data.text || '';
             extractionMethod = 'tesseract-ocr';
-            await worker.terminate();
           } catch (imgErr) {
-            console.error('Tesseract OCR error:', imgErr);
+            console.warn('Tesseract OCR note:', (imgErr as Error)?.message || imgErr);
+          } finally {
+            if (worker) {
+              try {
+                await worker.terminate();
+              } catch {
+                // Ignore worker termination errors
+              }
+            }
           }
         }
 

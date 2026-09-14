@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Sliders, 
   Save, 
   RotateCcw, 
   CheckCircle2, 
+  AlertCircle,
   HelpCircle, 
   Code, 
   RefreshCw,
@@ -28,32 +29,57 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
 }) => {
   const { t } = useLanguage();
   const [activeScheme, setActiveScheme] = useState<SchemeType>('NFST');
-  const [localRules, setLocalRules] = useState<Record<SchemeType, SchemeRuleConfig>>(currentRules);
+  const [localRules, setLocalRules] = useState<Record<SchemeType, SchemeRuleConfig>>(() => {
+    return currentRules || DEFAULT_SCHEME_RULES;
+  });
   const [showJson, setShowJson] = useState(false);
 
-  const activeConfig = localRules[activeScheme];
+  useEffect(() => {
+    if (currentRules) {
+      setLocalRules(currentRules);
+    }
+  }, [currentRules]);
 
-  const handleWeightChange = (key: string, val: number) => {
-    setLocalRules((prev) => ({
-      ...prev,
-      [activeScheme]: {
-        ...prev[activeScheme],
-        meritWeights: {
-          ...prev[activeScheme].meritWeights,
-          [key]: val,
+  const activeConfig: SchemeRuleConfig = localRules?.[activeScheme] || DEFAULT_SCHEME_RULES[activeScheme];
+  const eligibility = activeConfig?.eligibility || DEFAULT_SCHEME_RULES[activeScheme].eligibility;
+  const scoringWeights = activeConfig?.scoringWeights || DEFAULT_SCHEME_RULES[activeScheme].scoringWeights;
+  const totalWeight = (scoringWeights.academicMerit || 0) + 
+                      (scoringWeights.entranceOrUniversityRank || 0) + 
+                      (scoringWeights.sopOrResearchProposal || 0);
+
+  const handleWeightChange = (key: keyof SchemeRuleConfig['scoringWeights'], val: number) => {
+    setLocalRules((prev) => {
+      const currentSchemeConfig = prev[activeScheme] || DEFAULT_SCHEME_RULES[activeScheme];
+      return {
+        ...prev,
+        [activeScheme]: {
+          ...currentSchemeConfig,
+          scoringWeights: {
+            ...currentSchemeConfig.scoringWeights,
+            [key]: val,
+          },
         },
-      },
-    }));
+      };
+    });
   };
 
-  const handleCutoffChange = (field: 'minQualifyingMarksPercentage' | 'maxFamilyIncomeInr' | 'maxQsWorldRanking', val: number) => {
-    setLocalRules((prev) => ({
-      ...prev,
-      [activeScheme]: {
-        ...prev[activeScheme],
-        [field]: val,
-      },
-    }));
+  const handleCutoffChange = (
+    field: 'minQualifyingPercentage' | 'maxIncomeLimit' | 'maxForeignUniversityQsRank',
+    val: number | null
+  ) => {
+    setLocalRules((prev) => {
+      const currentSchemeConfig = prev[activeScheme] || DEFAULT_SCHEME_RULES[activeScheme];
+      return {
+        ...prev,
+        [activeScheme]: {
+          ...currentSchemeConfig,
+          eligibility: {
+            ...currentSchemeConfig.eligibility,
+            [field]: val,
+          },
+        },
+      };
+    });
   };
 
   const handleSave = () => {
@@ -141,15 +167,15 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
             <div>
               <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                 <span>{t('minQualifyingScore', 'Minimum Qualifying Degree Score (%):')}</span>
-                <span className="text-blue-600 font-bold">{activeConfig.minQualifyingMarksPercentage}%</span>
+                <span className="text-blue-600 font-bold">{eligibility.minQualifyingPercentage}%</span>
               </div>
               <input
                 type="range"
                 min="45"
                 max="75"
                 step="1"
-                value={activeConfig.minQualifyingMarksPercentage}
-                onChange={(e) => handleCutoffChange('minQualifyingMarksPercentage', Number(e.target.value))}
+                value={eligibility.minQualifyingPercentage}
+                onChange={(e) => handleCutoffChange('minQualifyingPercentage', Number(e.target.value))}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
               <p className="text-[11px] text-slate-400 mt-1">
@@ -163,7 +189,7 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                   <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                     <span>{t('annualFamilyIncomeCeiling', 'Annual Family Income Ceiling:')}</span>
                     <span className="text-blue-600 font-bold">
-                      ₹{activeConfig.maxFamilyIncomeInr?.toLocaleString('en-IN') || t('noLimit', 'No Limit')}
+                      ₹{eligibility.maxIncomeLimit?.toLocaleString('en-IN') || t('noLimit', 'No Limit')}
                     </span>
                   </div>
                   <input
@@ -171,8 +197,8 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                     min="500000"
                     max="1500000"
                     step="50000"
-                    value={activeConfig.maxFamilyIncomeInr || 800000}
-                    onChange={(e) => handleCutoffChange('maxFamilyIncomeInr', Number(e.target.value))}
+                    value={eligibility.maxIncomeLimit || 800000}
+                    onChange={(e) => handleCutoffChange('maxIncomeLimit', Number(e.target.value))}
                     className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
@@ -183,15 +209,15 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                 <div>
                   <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                     <span>{t('maxQsRanking', 'Maximum QS World Ranking:')}</span>
-                    <span className="text-blue-600 font-bold">{t('top', 'Top')} {activeConfig.maxQsWorldRanking}</span>
+                    <span className="text-blue-600 font-bold">{t('top', 'Top')} {eligibility.maxForeignUniversityQsRank || 500}</span>
                   </div>
                   <input
                     type="range"
                     min="100"
                     max="1000"
                     step="50"
-                    value={activeConfig.maxQsWorldRanking || 500}
-                    onChange={(e) => handleCutoffChange('maxQsWorldRanking', Number(e.target.value))}
+                    value={eligibility.maxForeignUniversityQsRank || 500}
+                    onChange={(e) => handleCutoffChange('maxForeignUniversityQsRank', Number(e.target.value))}
                     className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                   />
                   <p className="text-[11px] text-slate-400 mt-1">
@@ -204,7 +230,7 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
             <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
               <span className="font-bold text-slate-800">{t('mandatoryDocsConfigured', 'Mandatory Documents Configured:')}</span>
               <ul className="list-disc pl-4 text-[11px] space-y-0.5">
-                {activeConfig.mandatoryDocuments.map((d) => (
+                {(eligibility.mandatoryDocs || []).map((d) => (
                   <li key={d}>{d.replace(/_/g, ' ').toUpperCase()}</li>
                 ))}
               </ul>
@@ -213,22 +239,31 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
 
           {/* Merit Scoring Weights */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-5">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-slate-100 pb-2">
-              2. {t('meritWeightDist', 'Merit Scoring Weight Distribution (Total: 100%)')}
-            </h4>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                2. {t('meritWeightDist', 'Merit Scoring Weight Distribution')}
+              </h4>
+              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                totalWeight === 100 
+                  ? 'bg-emerald-100 text-emerald-800' 
+                  : 'bg-amber-100 text-amber-800'
+              }`}>
+                {t('totalWeight', 'Total:')} {totalWeight}% {totalWeight === 100 ? '✓' : '(Target: 100%)'}
+              </span>
+            </div>
 
             <div>
               <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                 <span>{t('academicDegreeWeight', 'Qualifying Academic Degree Weight:')}</span>
-                <span className="text-blue-600 font-bold">{activeConfig.meritWeights.qualifyingMarksWeight}%</span>
+                <span className="text-blue-600 font-bold">{scoringWeights.academicMerit}%</span>
               </div>
               <input
                 type="range"
                 min="10"
                 max="70"
                 step="5"
-                value={activeConfig.meritWeights.qualifyingMarksWeight}
-                onChange={(e) => handleWeightChange('qualifyingMarksWeight', Number(e.target.value))}
+                value={scoringWeights.academicMerit}
+                onChange={(e) => handleWeightChange('academicMerit', Number(e.target.value))}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
             </div>
@@ -238,7 +273,7 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                 <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                   <span>{t('ugcNetScoreWeight', 'UGC-NET / CSIR-NET Score Weight:')}</span>
                   <span className="text-blue-600 font-bold">
-                    {activeConfig.meritWeights.entranceExamWeight || 40}%
+                    {scoringWeights.entranceOrUniversityRank}%
                   </span>
                 </div>
                 <input
@@ -246,8 +281,8 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                   min="10"
                   max="70"
                   step="5"
-                  value={activeConfig.meritWeights.entranceExamWeight || 40}
-                  onChange={(e) => handleWeightChange('entranceExamWeight', Number(e.target.value))}
+                  value={scoringWeights.entranceOrUniversityRank}
+                  onChange={(e) => handleWeightChange('entranceOrUniversityRank', Number(e.target.value))}
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
@@ -256,7 +291,7 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                 <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                   <span>{t('qsRankingWeight', 'QS World Ranking Weight:')}</span>
                   <span className="text-blue-600 font-bold">
-                    {activeConfig.meritWeights.qsRankingWeight || 40}%
+                    {scoringWeights.entranceOrUniversityRank}%
                   </span>
                 </div>
                 <input
@@ -264,8 +299,8 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
                   min="10"
                   max="70"
                   step="5"
-                  value={activeConfig.meritWeights.qsRankingWeight || 40}
-                  onChange={(e) => handleWeightChange('qsRankingWeight', Number(e.target.value))}
+                  value={scoringWeights.entranceOrUniversityRank}
+                  onChange={(e) => handleWeightChange('entranceOrUniversityRank', Number(e.target.value))}
                   className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
                 />
               </div>
@@ -274,15 +309,15 @@ export const RuleEngineConfigView: React.FC<RuleEngineConfigViewProps> = ({
             <div>
               <div className="flex justify-between text-xs font-semibold text-slate-800 mb-1">
                 <span>{t('sopProposalWeight', 'Research Proposal / SOP Weight:')}</span>
-                <span className="text-blue-600 font-bold">{activeConfig.meritWeights.researchProposalWeight}%</span>
+                <span className="text-blue-600 font-bold">{scoringWeights.sopOrResearchProposal}%</span>
               </div>
               <input
                 type="range"
                 min="0"
-                max="40"
+                max="50"
                 step="5"
-                value={activeConfig.meritWeights.researchProposalWeight}
-                onChange={(e) => handleWeightChange('researchProposalWeight', Number(e.target.value))}
+                value={scoringWeights.sopOrResearchProposal}
+                onChange={(e) => handleWeightChange('sopOrResearchProposal', Number(e.target.value))}
                 className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
               />
             </div>

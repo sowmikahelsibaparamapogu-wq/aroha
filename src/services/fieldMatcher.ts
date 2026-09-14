@@ -449,5 +449,6 @@ export function matchAllDocumentsWithEnteredFields(
     mismatches?: string[];
   }>
 ): DocumentFieldMatchResult[] {
+  if (!docs || !Array.isArray(docs)) return [];
   return docs.map((doc) => matchEnteredFieldsWithDocument(entered, doc));
 }

@@ -277,7 +277,7 @@ export const RejectionDesk: React.FC<RejectionDeskProps> = ({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredRejections.map((app) => (
+                {(filteredRejections || []).map((app) => (
                   <tr key={app.id} className="hover:bg-rose-50/40 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-3">

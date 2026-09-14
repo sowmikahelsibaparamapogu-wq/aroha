@@ -178,7 +178,7 @@ export const MeritRankingView: React.FC<MeritRankingViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredRanked.map((app, idx) => {
+              {(filteredRanked || []).map((app, idx) => {
                 const rank = idx + 1;
                 const isSelected = rank <= slotLimit;
                 const meritScore = app.aiAnalysis?.meritScore || 85;

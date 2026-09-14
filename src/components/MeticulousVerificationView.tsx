@@ -235,7 +235,7 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
             Select Document:
           </span>
-          {application.documents.map((d, idx) => (
+          {(application.documents || []).map((d, idx) => (
             <button
               key={d.id}
               type="button"
@@ -319,7 +319,7 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
                   <span>Red-Flag Indicators Triggered (Category 9 capped at 30/100):</span>
                 </div>
                 <ul className="list-disc pl-5 space-y-1 text-xs text-rose-900 font-medium">
-                  {report.red_flags_triggered.map((rf, i) => (
+                  {(report.red_flags_triggered || []).map((rf, i) => (
                     <li key={i}>{rf}</li>
                   ))}
                 </ul>
@@ -348,7 +348,7 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
             </p>
 
             <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
-              {report.pages_or_sections_read.map((sec, idx) => (
+              {(report.pages_or_sections_read || []).map((sec, idx) => (
                 <div key={idx} className="flex items-start gap-2">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                   <span className="text-slate-800 font-medium text-[11px]">{sec}</span>
@@ -363,7 +363,7 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
                   <span>Read / OCR Integrity Notes:</span>
                 </div>
                 <ul className="list-disc pl-5 space-y-0.5 text-[11px]">
-                  {report.read_issues.map((issue, idx) => (
+                  {(report.read_issues || []).map((issue, idx) => (
                     <li key={idx}>{issue}</li>
                   ))}
                 </ul>
@@ -388,8 +388,8 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              {report.category_scores.map((cat, idx) => {
-                const hasIssues = cat.issues_found.length > 0;
+              {(report.category_scores || []).map((cat, idx) => {
+                const hasIssues = (cat.issues_found || []).length > 0;
 
                 return (
                   <div
@@ -426,7 +426,7 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
                     {/* Issues / Deductions details */}
                     {hasIssues ? (
                       <div className="mt-2 space-y-1.5">
-                        {cat.issues_found.map((issue, iIdx) => (
+                        {(cat.issues_found || []).map((issue, iIdx) => (
                           <div
                             key={iIdx}
                             className="bg-white/90 p-2 rounded-lg border border-slate-200/80 text-[11px] text-slate-800 leading-snug"
@@ -560,7 +560,7 @@ export const MeticulousVerificationView: React.FC<MeticulousVerificationViewProp
               </div>
 
               <div className="space-y-2">
-                {filteredRecords.map((r) => {
+                {(filteredRecords || []).map((r) => {
                   const isSelected = selectedMasterRecord?.record_id === r.record_id;
 
                   return (

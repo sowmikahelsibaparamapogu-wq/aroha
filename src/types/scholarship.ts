@@ -219,8 +219,17 @@ export interface SystemStats {
   averageProcessingDays: number;
   pendingDeficiencies: number;
   schemeBreakdown: {
-    nfstCount: number;
-    nosCount: number;
+    nfstCount?: number;
+    nosCount?: number;
+    NFST?: number;
+    NOS?: number;
   };
-  stateWiseCount: Record<string, number>;
+  stateWiseCount?: Record<string, number>;
+  stateDistribution?: Record<string, number>;
+  aiPreVerifiedCount?: number;
+  aiPreVerifiedPercentage?: number;
+  approvedCount?: number;
+  meritListedCount?: number;
+  dbtActiveCount?: number;
+  dbtTotalDisbursedInr?: number;
 }

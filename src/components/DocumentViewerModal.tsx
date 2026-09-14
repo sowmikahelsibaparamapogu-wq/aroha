@@ -182,7 +182,11 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
     const win = window.open('', '_blank');
     if (!win) return;
 
-    const fieldsHtml = Object.entries(doc.extractedFields || {})
+    const extracted = doc.extractedFields || {};
+    const refId = extracted['Certificate Number'] || extracted['Certificate No'] || extracted['Roll / Registration No'] || doc.id;
+    const issuingAuth = extracted['Issuing Authority'] || 'Competent Authority';
+
+    const fieldsHtml = Object.entries(extracted)
       .map(
         ([k, v]) => `
       <div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #fde68a; font-family:sans-serif; font-size:13px;">
@@ -236,7 +240,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
       <div style="font-size:11px; font-family:sans-serif; color:#78350f; margin-top:4px;">National Scholarship Portal (NSP) • Ministry of Tribal Affairs (MoTA) Attested Record</div>
     </div>
     <div class="ref-bar">
-      <span>REF ID: <strong>${doc.extractedFields['Certificate Number'] || doc.extractedFields['Certificate No'] || doc.extractedFields['Roll / Registration No'] || doc.id}</strong></span>
+      <span>REF ID: <strong>${refId}</strong></span>
       <span>DATE OF ISSUE: <strong>${new Date(doc.uploadedAt).toLocaleDateString('en-IN')}</strong></span>
       <span>STATUS: <strong style="color:#059669;">e-Pramaan VERIFIED</strong></span>
     </div>
@@ -256,7 +260,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
         </div>
       </div>
       <div style="text-align:right;">
-        <div style="font-weight:bold; color:#451a03; font-size:13px;">${doc.extractedFields['Issuing Authority'] || 'Competent Authority'}</div>
+        <div style="font-weight:bold; color:#451a03; font-size:13px;">${issuingAuth}</div>
         <div style="color:#64748b; font-size:11px;">Authorized Statutory Signatory under MoTA Rules</div>
       </div>
     </div>
@@ -281,13 +285,14 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
 
   // Build legal attestation statement based on document type
   const getAttestationStatement = () => {
-    const name = doc.extractedFields['Candidate Name'] || doc.extractedFields['Applicant Name in Document'] || application?.applicant.fullName || 'Candidate';
-    const father = doc.extractedFields['Father / Guardian'] || doc.extractedFields["Father's Name"] || application?.applicant.fatherName || '';
-    const community = doc.extractedFields['Community / Tribe'] || doc.extractedFields['Tribe Community'] || application?.applicant.stCommunity || '';
-    const district = doc.extractedFields['District'] || application?.applicant.district || '';
-    const state = doc.extractedFields['State'] || application?.applicant.state || '';
-    const income = doc.extractedFields['Annual Family Income (INR)'] || doc.extractedFields['Annual Income'] || application?.applicant.annualFamilyIncome;
-    const marks = doc.extractedFields['Aggregate Percentage'] || doc.extractedFields['Total Percentage'] || (application?.academic.qualifyingPercentage ? `${application.academic.qualifyingPercentage}%` : '');
+    const fields = doc.extractedFields || {};
+    const name = fields['Candidate Name'] || fields['Applicant Name in Document'] || application?.applicant.fullName || 'Candidate';
+    const father = fields['Father / Guardian'] || fields["Father's Name"] || application?.applicant.fatherName || '';
+    const community = fields['Community / Tribe'] || fields['Tribe Community'] || application?.applicant.stCommunity || '';
+    const district = fields['District'] || application?.applicant.district || '';
+    const state = fields['State'] || application?.applicant.state || '';
+    const income = fields['Annual Family Income (INR)'] || fields['Annual Income'] || application?.applicant.annualFamilyIncome;
+    const marks = fields['Aggregate Percentage'] || fields['Total Percentage'] || (application?.academic.qualifyingPercentage ? `${application.academic.qualifyingPercentage}%` : '');
 
     switch (doc.type) {
       case 'caste_certificate':
@@ -295,9 +300,9 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
       case 'income_certificate':
         return `This is to certify that the gross annual family income from all revenue sources of Shri/Smt ${name}${father ? `, Son/Daughter of ${father}` : ''}, resident of ${district ? `${district}, ` : ''}${state || 'India'}, is verified as ₹${income ? Number(income).toLocaleString('en-IN') : 'Certified Amount'}/- per annum. This certificate is issued for educational scholarship and higher education fellowship purposes under Ministry of Tribal Affairs statutory guidelines.`;
       case 'marksheet':
-        return `Official Academic Marksheet & Transcript of Master's / Qualifying Degree issued to ${name}. Roll/Registration No: ${doc.extractedFields['Roll / Registration No'] || doc.extractedFields['Roll Number'] || 'N/A'}. Total Aggregate Percentage verified at ${marks || 'Passing Criteria'}. Candidate has met the minimum 55% qualifying cutoff required for MoTA fellowship consideration.`;
+        return `Official Academic Marksheet & Transcript of Master's / Qualifying Degree issued to ${name}. Roll/Registration No: ${fields['Roll / Registration No'] || fields['Roll Number'] || 'N/A'}. Total Aggregate Percentage verified at ${marks || 'Passing Criteria'}. Candidate has met the minimum 55% qualifying cutoff required for MoTA fellowship consideration.`;
       case 'offer_letter':
-        return `Admission and Enrolment Confirmation issued to ${name} for postgraduate / doctoral research program. Offer Type: ${doc.extractedFields['Offer Status'] || 'Confirmed Admission'}. University QS World Ranking: ${doc.extractedFields['QS World Ranking'] || application?.academic.qsWorldRanking || 'Within Top 500'}. Evaluated under National Overseas Scholarship (NOS) guidelines.`;
+        return `Admission and Enrolment Confirmation issued to ${name} for postgraduate / doctoral research program. Offer Type: ${fields['Offer Status'] || 'Confirmed Admission'}. University QS World Ranking: ${fields['QS World Ranking'] || application?.academic.qsWorldRanking || 'Within Top 500'}. Evaluated under National Overseas Scholarship (NOS) guidelines.`;
       case 'bonafide_certificate':
         return `Bonafide Research Scholar Certificate & UGC-NET / CSIR-NET Qualification Record issued to ${name}. Validated for enrolment in Ph.D. / M.Phil. research and National Fellowship for Higher Education of ST Students (NFST) stipend release.`;
       default:
@@ -636,9 +641,9 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
                         <span className="text-slate-600">
                           Ref No:{' '}
                           <strong className="text-slate-900">
-                            {doc.extractedFields['Certificate Number'] ||
-                              doc.extractedFields['Certificate No'] ||
-                              doc.extractedFields['Roll / Registration No'] ||
+                            {doc.extractedFields?.['Certificate Number'] ||
+                              doc.extractedFields?.['Certificate No'] ||
+                              doc.extractedFields?.['Roll / Registration No'] ||
                               doc.id}
                           </strong>
                         </span>
@@ -709,7 +714,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
 
                         <div className="text-right space-y-1">
                           <div className="font-bold text-amber-950 text-sm">
-                            {doc.extractedFields['Issuing Authority'] || 'Competent Authority'}
+                            {doc.extractedFields?.['Issuing Authority'] || 'Competent Authority'}
                           </div>
                           <div className="text-[11px] text-slate-600">
                             Sub-Divisional Magistrate / Competent Officer
@@ -783,7 +788,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
                     <span>Discrepancies Flagged by Audit Scanner:</span>
                   </div>
                   <ul className="list-disc pl-5 space-y-1 text-rose-200 text-[11px]">
-                    {doc.mismatches.map((m, i) => (
+                    {(doc.mismatches || []).map((m, i) => (
                       <li key={i}>{m}</li>
                     ))}
                   </ul>
@@ -861,7 +866,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
                 </span>
               </div>
 
-              {matchResult && matchResult.fieldComparisons.length > 0 ? (
+              {matchResult && matchResult.fieldComparisons && matchResult.fieldComparisons.length > 0 ? (
                 <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-slate-800 text-slate-300 font-bold border-b border-slate-700">
@@ -873,7 +878,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800">
-                      {matchResult.fieldComparisons.map((cmp, idx) => (
+                      {(matchResult.fieldComparisons || []).map((cmp, idx) => (
                         <tr
                           key={idx}
                           className={cmp.isMatch ? 'hover:bg-slate-850' : 'bg-rose-950/40 font-semibold'}
@@ -936,19 +941,19 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
                     <div className="flex justify-between border-b border-slate-800 pb-1.5">
                       <span className="text-slate-400">e-Pramaan Barcode Status:</span>
                       <span className="font-bold text-emerald-400">
-                        {doc.extractedFields['Digital Barcode'] || 'VALID (e-District Verified)'}
+                        {doc.extractedFields?.['Digital Barcode'] || 'VALID (e-District Verified)'}
                       </span>
                     </div>
                     <div className="flex justify-between border-b border-slate-800 pb-1.5">
                       <span className="text-slate-400">Digital Certificate (DSC):</span>
                       <span className="font-bold text-emerald-400">
-                        {doc.extractedFields['Digital Signature'] || 'CCA India Class-3 Verified'}
+                        {doc.extractedFields?.['Digital Signature'] || 'CCA India Class-3 Verified'}
                       </span>
                     </div>
                     <div className="flex justify-between border-b border-slate-800 pb-1.5">
                       <span className="text-slate-400">Issuing Authority:</span>
                       <span className="font-semibold text-white">
-                        {doc.extractedFields['Issuing Authority'] || 'Executive Magistrate / SDM'}
+                        {doc.extractedFields?.['Issuing Authority'] || 'Executive Magistrate / SDM'}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -977,7 +982,7 @@ ${(doc.mismatches || []).join('\n') || 'None recorded. Document is 100% complian
                     <div className="flex justify-between border-b border-slate-800 pb-1.5">
                       <span className="text-slate-400">Document Format:</span>
                       <span className="font-semibold text-white">
-                        {doc.extractedFields['Certificate Format'] || 'Statutory Official Format'}
+                        {doc.extractedFields?.['Certificate Format'] || 'Statutory Official Format'}
                       </span>
                     </div>
                     <div className="flex justify-between">

@@ -351,7 +351,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
       applicant: partialApp.applicant!,
       academic: partialApp.academic!,
       bankDetails: partialApp.bankDetails!,
-      documents: documents.map((d) => ({
+      documents: (documents || []).map((d) => ({
         ...d,
         offlineQueued: !isOnline,
       })),
@@ -1468,7 +1468,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                 </div>
 
                 <div className="space-y-2">
-                  {documentMatchResults
+                  {(documentMatchResults || [])
                     .filter((r) => r.hasErrors)
                     .map((res, idx) => (
                       <div key={idx} className="bg-white p-3 rounded-lg border border-rose-200 text-xs space-y-1.5 shadow-xs">
@@ -1479,7 +1479,7 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                           </span>
                         </div>
                         <ul className="space-y-1">
-                          {res.errorMessages.map((msg, mIdx) => (
+                          {(res.errorMessages || []).map((msg, mIdx) => (
                             <li key={mIdx} className="text-[11px] text-rose-800 font-semibold flex items-start gap-1.5">
                               <span className="text-rose-600 font-bold shrink-0">❌</span>
                               <span>{msg}</span>
@@ -1633,14 +1633,14 @@ export const MultiStepForm: React.FC<MultiStepFormProps> = ({
                   </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1">
-                  {documentMatchResults
+                  {(documentMatchResults || [])
                     .filter((r) => r.hasErrors)
                     .map((res, i) => (
                       <div key={i} className="bg-white p-2.5 rounded-lg border border-rose-200 shadow-xs">
                         <span className="font-bold text-rose-950 block text-[11px] mb-1">
                           📄 {res.documentName}:
                         </span>
-                        {res.errorMessages.map((e, ei) => (
+                        {(res.errorMessages || []).map((e, ei) => (
                           <p key={ei} className="text-rose-800 text-[10.5px] font-semibold flex items-start gap-1">
                             <span className="text-rose-600 shrink-0">❌</span>
                             <span>{e}</span>
