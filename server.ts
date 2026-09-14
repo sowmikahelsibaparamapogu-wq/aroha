@@ -1,7 +1,8 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { createWorker } from 'tesseract.js';
 import { PDFParse } from 'pdf-parse';
 
@@ -436,7 +437,7 @@ app.post('/api/scan-document', async (req, res) => {
 // Multilingual Chatbot Endpoint
 app.post('/api/chat', async (req, res) => {
   try {
-    const { message, language = 'en' } = req.body;
+    const { message, language = 'en', history = [] } = req.body;
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
     }
@@ -462,46 +463,79 @@ app.post('/api/chat', async (req, res) => {
 
     const targetLangName = languageNames[language] || language;
 
-    const systemInstruction = `You are AROHA Mitra, the friendly, empathetic, and authoritative AI assistant for the Ministry of Tribal Affairs (MoTA), Government of India, supporting the AROHA portal (AI-Enabled Robust Online Higher-Education & Fellowship Architecture).
+    const systemInstruction = `You are AROHA Mitra, the friendly, empathetic, and highly knowledgeable AI assistant for the Ministry of Tribal Affairs (MoTA), Government of India, supporting the AROHA portal (AI-Enabled Robust Online Higher-Education & Fellowship Architecture).
 
-YOUR MANDATES:
-1. SCHOLARSHIP & FELLOWSHIP EXPERTISE:
-   - National Fellowship for Higher Education of ST Students (NFST): 750 annual slots, JRF (₹37,000/month for first 2 years), SRF (₹42,000/month for next 3 years), contingency grant (₹20,500/yr Humanities, ₹25,000/yr Science), 30% statutory quota for ST female scholars, minimum 55% in Master's degree, UGC-NET/CSIR-NET qualification, monthly PFMS Direct Benefit Transfer (DBT) on the 1st of every month.
+YOUR DUAL MANDATE:
+1. SCHOLARSHIP & MOTA EXPERTISE:
+   - National Fellowship for Higher Education of ST Students (NFST): 750 annual slots, JRF stipend (₹37,000/month for first 2 years), SRF (₹42,000/month for next 3 years), contingency grant (₹20,500/yr Humanities, ₹25,000/yr Science), 30% statutory quota strictly for ST female scholars, minimum 55% in Master's degree, UGC-NET/CSIR-NET qualification, monthly PFMS Direct Benefit Transfer (DBT) on the 1st of every month.
    - National Overseas Scholarship for ST Candidates (NOS): 20 annual slots for Master's, Ph.D, and Post-Doctoral studies at institutions in the Top 500 QS World University Rankings, 100% tuition fees covered directly by the Government of India, annual maintenance allowance (£9,900 UK / $15,400 USA and other countries), economy return airfare and visa fees, annual family income ceiling of ₹8,00,000 (8 Lakhs), age limit below 35 years as of 1st July.
    - Verification & Scrutiny: AI OCR verification of Caste Certificates and academic documents; detecting discrepancies (such as surname mismatch between application and revenue certificate, requiring an SDM affidavit or Gazette notification); resolving Deficiency Notices within 15 days via the Track Status tab.
    - Offline-First PWA: Built for remote tribal areas (Adilabad, Bastar, Koraput, Khunti, Mayurbhanj), allowing applicants to fill forms and queue documents in local IndexedDB without internet, auto-syncing when network reconnects.
    - Tribal Culture & Heritage: Scheduled Tribes of India (Article 342, 705+ notified communities, PVTGs like Birhor, Chenchu, Maria Gond), master tribal arts like Warli, Gond, Dokra lost-wax casting, Santhal folklore, Saura art.
 
-2. ANSWER ANY QUESTION:
-   - You can answer ANY question the user asks! Whether it is general knowledge, history, science, geography, mathematics, coding, daily life, culture, philosophy, general conversation, or greetings.
-   - Never say "I can only answer scholarship questions". If the question is general (e.g., "What is the capital of France?", "Who is the Prime Minister of India?", "Write a poem", "Tell me about photosynthesis"), provide an accurate, high-quality answer.
+2. ANSWER ANY TYPE OF QUESTION (UNIVERSAL KNOWLEDGE):
+   - You can answer ANY question the user asks! Whether it is general knowledge, history, science, geography, mathematics, coding, study advice, daily life, culture, philosophy, general conversation, or greetings.
+   - Never refuse or say "I can only answer scholarship questions". If the question is general (e.g., "What is the capital of France?", "Who is the Prime Minister of India?", "Solve 15 * 24", "Explain quantum physics", "Write a study plan"), answer clearly, accurately, and thoroughly.
 
-3. MULTILINGUAL EXCELLENCE:
-   - The user's active portal language is: ${targetLangName}.
-   - ALWAYS respond fluently in ${targetLangName}, OR in whatever language the user typed their question in.
-   - Use clean Markdown with bolding and bullet points for readability.`;
+3. MULTILINGUAL & FORMATTING:
+   - User active language preference is: ${targetLangName}.
+   - ALWAYS respond fluently in ${targetLangName}, OR match the exact language/script the user used to ask their question.
+   - Use clean Markdown with bold headings, bullet points, and numbered steps for maximum readability. Keep responses helpful, structured, and polite.`;
 
-    const prompt = `User query: "${message}"\nActive language preference: ${targetLangName}.\nPlease provide an accurate, helpful, and culturally respectful response in ${targetLangName} (or match the user's query language).`;
+    // Construct conversation payload with multi-turn history if provided
+    const contentsPayload: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+    if (Array.isArray(history) && history.length > 0) {
+      // Pick last 6 messages to preserve context while keeping token count lean and fast
+      const recent = history.slice(-6);
+      for (const h of recent) {
+        if (h && typeof h.text === 'string' && h.text.trim()) {
+          contentsPayload.push({
+            role: h.sender === 'user' ? 'user' : 'model',
+            parts: [{ text: h.text.trim() }],
+          });
+        }
+      }
+    }
+
+    contentsPayload.push({
+      role: 'user',
+      parts: [
+        {
+          text: `User query: "${message}"\nTarget language: ${targetLangName}.\nPlease provide an accurate, helpful, and culturally respectful response in ${targetLangName} (or matching query language).`,
+        },
+      ],
+    });
 
     let replyText: string | null = null;
-    const candidateModels = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.1-flash-lite'];
+    let modelUsed: string | null = null;
+    // gemini-3.1-flash-lite is ultra-fast (~1.5s), backed up by gemini-flash-latest and gemini-3.8-flash
+    const candidateModels = ['gemini-3.1-flash-lite', 'gemini-flash-latest', 'gemini-3.8-flash'];
 
     for (const modelName of candidateModels) {
       try {
+        const config: any = {
+          systemInstruction,
+          temperature: 0.7,
+        };
+        // Use ThinkingLevel.LOW for gemini-3.8-flash to minimize latency
+        if (modelName === 'gemini-3.8-flash') {
+          config.thinkingConfig = { thinkingLevel: ThinkingLevel.LOW };
+        }
+
         const response = await ai.models.generateContent({
           model: modelName,
-          contents: prompt,
-          config: {
-            systemInstruction,
-            temperature: 0.7,
-          },
+          contents: contentsPayload,
+          config,
         });
+
         if (response && response.text) {
           replyText = response.text;
+          modelUsed = modelName;
           break;
         }
-      } catch {
-        // Silently proceed to candidate fallback model to handle temporary high demand spikes
+      } catch (err: any) {
+        console.warn(`Attempt with ${modelName} failed, trying next:`, err?.message || err);
         continue;
       }
     }
@@ -510,8 +544,9 @@ YOUR MANDATES:
       return res.json({ fallback: true });
     }
 
-    return res.json({ reply: replyText });
-  } catch {
+    return res.json({ reply: replyText, model: modelUsed, isAiGenerated: true });
+  } catch (err: any) {
+    console.error('Chat endpoint error:', err);
     return res.json({ fallback: true });
   }
 });
